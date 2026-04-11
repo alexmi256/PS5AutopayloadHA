@@ -1,0 +1,15 @@
+# PS5 Autoload-Profil: GoldHen
+# Dieses Profil sendet automatisch den Exploit und lädt GoldHen.
+#
+# ANLEITUNG:
+#   1. exploit.lua und goldhen.elf in das Payload-Verzeichnis hochladen
+#   2. Dieses Profil auswählen und ausführen
+
+# Exploit senden (automatisch Port 9026 für .lua)
+# exploit.lua
+
+# Warte bis der ELF-Loader auf Port 9021 bereit ist (Timeout 90 Sekunden)
+# ?9021 90
+
+# GoldHen laden (automatisch Port 9021 für .elf)
+# goldhen.elf

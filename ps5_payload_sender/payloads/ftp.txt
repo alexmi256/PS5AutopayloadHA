@@ -1,0 +1,17 @@
+# PS5 Autoload-Profil: FTP-Server
+# Exploit + GoldHen + FTP-Server in einem Durchlauf.
+
+# Exploit senden
+# exploit.lua
+
+# Warte auf ELF-Loader
+# ?9021 90
+
+# GoldHen laden
+# goldhen.elf
+
+# Kurze Pause – GoldHen braucht einen Moment
+# !3000
+
+# FTP-Server starten
+# ftp.elf 9021

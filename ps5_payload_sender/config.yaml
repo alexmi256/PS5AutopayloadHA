@@ -1,0 +1,36 @@
+name: PS5 Autopayload
+description: Manage and automate PS5 payload workflows from Home Assistant
+version: "1.0.0"
+slug: ps5_payload_sender
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+  - i386
+homeassistant_api: true
+ingress: true
+ingress_port: 8765
+ingress_stream: true
+ports:
+  8765/tcp: 8765
+ports_description:
+  8765/tcp: Web UI
+options:
+  ps5_ip: ""
+  lua_port: 9026
+  elf_port: 9021
+  port_check_timeout: 10
+  port_check_interval: 500
+schema:
+  ps5_ip: str
+  lua_port: int
+  elf_port: int
+  port_check_timeout: int
+  port_check_interval: int
+panel_icon: mdi:gamepad-variant
+panel_title: PS5 Autopayload
+map:
+  - share:rw
+  - config:rw

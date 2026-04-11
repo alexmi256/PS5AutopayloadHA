@@ -1,0 +1,5 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Finish script for the PS5 Payload Sender service
+# ==============================================================================
+bashio::log.info "PS5 Payload Sender stopped."

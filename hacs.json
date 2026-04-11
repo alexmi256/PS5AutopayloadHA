@@ -1,0 +1,9 @@
+{
+  "name": "PS5 Payload Sender",
+  "description": "Home Assistant Add-on zum Senden von Lua und ELF Payloads an eine PlayStation 5 via TCP",
+  "render_readme": true,
+  "homeassistant": "2023.1.0",
+  "categories": [
+    "add-on"
+  ]
+}
