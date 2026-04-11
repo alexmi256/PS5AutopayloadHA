@@ -259,12 +259,6 @@ body {
 }
 .p-port-input:focus { outline:none; border-color:var(--focus) }
 
-/* ---- Send button (payload list) – canonical definition in v3.9 section ---- */
-
-/* ---- Update button ---- */
-.btn-update { font-size:.72rem; color:var(--muted); border-color:var(--border) }
-.btn-update:hover { color:var(--primary); border-color:var(--primary) }
-
 /* ---- Visual Builder ---- */
 .builder-add-btns { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.55rem }
 
@@ -355,15 +349,6 @@ body {
   padding:.15rem .4rem; background:rgba(148,163,184,.09);
   border:1px solid var(--border); border-radius:.25rem; flex-shrink:0;
 }
-.favorites-list { display:flex; flex-wrap:wrap; gap:.35rem }
-.fav-btn {
-  font-size:.87rem; font-weight:600; padding:.5rem .9rem;
-  background:rgba(74,108,247,.1); border-color:var(--primary); color:var(--primary);
-}
-.fav-btn:hover { background:var(--primary); color:#fff }
-.fav-active { color:var(--lua) !important; border-color:var(--lua) !important; background:rgba(245,158,11,.1) !important }
-.fav-active:hover { background:var(--lua) !important; color:#fff !important }
-.fav-label { white-space:nowrap; flex-shrink:0; cursor:pointer }
 .profile-list { display:flex; flex-direction:column; gap:.3rem }
 .profile-item {
   display:flex; align-items:center; gap:.4rem; padding:.45rem .6rem;
