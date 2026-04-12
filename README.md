@@ -102,6 +102,57 @@ The ELF Loader:
 
 ---
 
+## Screenshots
+
+### Connection
+Set your PS5 IP address and manage saved devices.
+
+![Connection](docs/screenshots/connection.png)
+
+---
+
+### Quick Start
+Pin your most-used profiles for instant one-tap execution.
+
+![Quick Start](docs/screenshots/quick-start.png)
+
+---
+
+### Payloads
+Upload, search, filter and send `.lua` and `.elf` payloads directly to your PS5.
+
+![Payloads](docs/screenshots/payloads.png)
+
+---
+
+### Auto-Load Builder
+Build automated payload chains visually — with delays, port waits and reordering.
+
+![Auto-Load Builder](docs/screenshots/builder.png)
+
+---
+
+### Saved Profiles
+Manage all your profiles — pin to Quick Start, edit, run or delete.
+
+![Saved Profiles](docs/screenshots/profiles.png)
+
+---
+
+### Port Check
+Manually check or wait for a specific port to become available.
+
+![Port Check](docs/screenshots/port-check.png)
+
+---
+
+### Status Log
+Live output of every execution step with timestamps and color-coded results.
+
+![Status](docs/screenshots/status.png)
+
+---
+
 ## Home Assistant Integration
 
 > **The integration must be installed to use automations, services, and entities.**  
@@ -230,11 +281,12 @@ goldhen.elf
 
 | Section | Description |
 |---------|-------------|
+| **Connection** | Set PS5 IP address and manage saved devices |
 | **Quick Start** | Pinned profiles for one-click execution |
-| **Connection** | Set PS5 IP address |
 | **Payloads** | Upload, manage, and send individual payloads |
 | **Auto-Load Builder** | Create and edit automation workflows visually |
 | **Saved Profiles** | All profiles with run / edit / delete controls |
+| **Port Check** | Manually verify port availability on the PS5 |
 | **Status Log** | Live output from the current or last execution |
 
 ---
@@ -270,7 +322,6 @@ All data is stored in the HA config volume — nothing is lost on add-on updates
 
 - [ ] Smart Auto Mode (detect PS5 state automatically)
 - [ ] Docker standalone version (without Home Assistant)
-- [ ] Mobile UI improvements
 - [ ] Profile import / export
 - [ ] Webhook trigger support
 
