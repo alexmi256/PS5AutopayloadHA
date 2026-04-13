@@ -59,3 +59,23 @@ class AnalyzePortRequest(BaseModel):
     port: int
     timeout: float = 30.0
     interval: float = 0.5
+
+
+class FlowStepModel(BaseModel):
+    type: str                           # 'payload' | 'delay' | 'wait_port'
+    # payload fields
+    filename: str = ""
+    autoPort: int = 0
+    portOverride: Optional[int] = None
+    # delay fields
+    ms: int = 0
+    # wait_port fields
+    port: int = 0
+    timeout: float = 60.0
+    interval_ms: int = 500
+
+
+class FlowAnalyzeRequest(BaseModel):
+    host: str
+    steps: List[FlowStepModel]
+    safe_mode: bool = True

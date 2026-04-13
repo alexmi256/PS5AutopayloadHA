@@ -32,8 +32,10 @@ APP_VERSION = "1.0.0-dev"
 MAX_PAYLOAD_VERSIONS  = 3     # versions kept per payload
 MAX_TIMING_ENTRIES    = 10    # timing samples kept per port
 MAX_LOG_ENTRIES       = 500   # log entries kept in history
+MAX_FLOW_RUNS         = 10    # flow analysis runs stored
 
-TIMING_FILE = CONFIG_BASE / "port_timing.json"
+TIMING_FILE    = CONFIG_BASE / "port_timing.json"
+FLOW_RUNS_FILE = CONFIG_BASE / "flow_runs.json"
 GITHUB_RAW_CONFIG = (
     "https://raw.githubusercontent.com/cosmicflow2512/PS5AutopayloadHA"
     "/main/ps5_payload_sender/config.yaml"

@@ -7,6 +7,7 @@ async function refreshProfiles() {
     state.profiles = data.profiles || [];
     renderProfileList();
     renderFavorites();
+    if (typeof updateProfilesSummary === 'function') updateProfilesSummary();
   } catch (e) { log('Load profiles: ' + e.message, 'error'); }
 }
 

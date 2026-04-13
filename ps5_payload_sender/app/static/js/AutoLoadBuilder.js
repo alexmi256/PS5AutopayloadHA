@@ -549,6 +549,7 @@ function builderRenderList() {
 
     container.appendChild(stepEl);
   });
+  if (typeof updateBuilderSummary === 'function') updateBuilderSummary();
 }
 
 function builderMoveStep(idx, dir) {

@@ -13,6 +13,7 @@ async function refreshPayloads() {
     );
     renderPayloadFilters();
     renderPayloads();
+    if (typeof updatePayloadsSummary === 'function') updatePayloadsSummary();
   } catch (e) { log('Load payloads: ' + e.message, 'error'); }
 }
 

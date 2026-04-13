@@ -28,7 +28,7 @@
 
   <main class="main">
 
-    <!-- CONNECTION -->
+    <!-- CONNECTION (always open) -->
     <section class="card">
       <h2 class="card-title">Connection</h2>
 
@@ -60,260 +60,304 @@
       </div>
     </section>
 
-    <!-- QUICK START (profile quick-launch) -->
+    <!-- QUICK START (always open) -->
     <section id="favorites-card" class="card">
       <h2 class="card-title">Quick Start</h2>
       <p class="qs-subtitle">Tap to run immediately</p>
       <div id="favorites-list" class="qs-list"></div>
     </section>
 
-    <!-- PAYLOAD SOURCES -->
-    <section class="card">
-      <div class="card-header-row">
-        <h2 class="card-title">Payload Sources</h2>
-        <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
-      </div>
-      <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
-
-      <!-- Add source panel -->
-      <div id="source-add-panel" class="add-panel" style="display:none">
-        <div class="field-group">
-          <label class="field-label" for="source-repo-input">Repository <span class="field-hint">owner/repo</span></label>
-          <input type="text" id="source-repo-input" class="input"
-            placeholder="e.g. ps5-payload-dev/kstuff"
-            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="source-filter-input">Asset filter <span class="field-hint">optional, e.g. *.elf</span></label>
-          <input type="text" id="source-filter-input" class="input"
-            placeholder="*.elf  (leave empty for all)"
-            autocomplete="off" spellcheck="false" />
-        </div>
+    <!-- PAYLOAD SOURCES (collapsible) -->
+    <section class="card collapsible" id="section-sources">
+      <div class="card-header-row collapse-toggle" data-section="sources">
+        <h2 class="card-title">Payload Sources <span class="collapse-summary" id="summary-sources"></span></h2>
         <div class="row-gap">
-          <button id="btn-source-fetch" class="btn btn-primary btn-sm" style="flex:1">Detect Payloads</button>
-          <button id="btn-source-panel-x" class="btn btn-sm">✕</button>
+          <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
+          <span class="collapse-icon" aria-hidden="true">▲</span>
         </div>
-        <div id="source-add-status" class="source-status" style="margin-top:.4rem"></div>
+      </div>
+      <div class="collapse-body">
+        <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
 
-        <!-- Detected payloads -->
-        <div id="source-detected" style="display:none;margin-top:.6rem">
-          <div class="detected-header">
-            <p class="field-label" style="margin-bottom:0">Detected payloads:</p>
-            <div class="detected-select-bar">
-              <button class="btn btn-xs" onclick="_selectAllDetected()">Select All</button>
-              <button class="btn btn-xs" onclick="_deselectAllDetected()">Deselect All</button>
-              <span id="detected-count" class="detected-count"></span>
-            </div>
+        <!-- Add source panel -->
+        <div id="source-add-panel" class="add-panel" style="display:none">
+          <div class="field-group">
+            <label class="field-label" for="source-repo-input">Repository <span class="field-hint">owner/repo</span></label>
+            <input type="text" id="source-repo-input" class="input"
+              placeholder="e.g. ps5-payload-dev/kstuff"
+              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
           </div>
-          <div id="source-detected-list" style="margin-top:.35rem"></div>
-          <button id="btn-source-import" class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%" disabled>Import Selected</button>
+          <div class="field-group">
+            <label class="field-label" for="source-filter-input">Asset filter <span class="field-hint">optional, e.g. *.elf</span></label>
+            <input type="text" id="source-filter-input" class="input"
+              placeholder="*.elf  (leave empty for all)"
+              autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="row-gap">
+            <button id="btn-source-fetch" class="btn btn-primary btn-sm" style="flex:1">Detect Payloads</button>
+            <button id="btn-source-panel-x" class="btn btn-sm">✕</button>
+          </div>
+          <div id="source-add-status" class="source-status" style="margin-top:.4rem"></div>
+
+          <!-- Detected payloads -->
+          <div id="source-detected" style="display:none;margin-top:.6rem">
+            <div class="detected-header">
+              <p class="field-label" style="margin-bottom:0">Detected payloads:</p>
+              <div class="detected-select-bar">
+                <button class="btn btn-xs" onclick="_selectAllDetected()">Select All</button>
+                <button class="btn btn-xs" onclick="_deselectAllDetected()">Deselect All</button>
+                <span id="detected-count" class="detected-count"></span>
+              </div>
+            </div>
+            <div id="source-detected-list" style="margin-top:.35rem"></div>
+            <button id="btn-source-import" class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%" disabled>Import Selected</button>
+          </div>
         </div>
-      </div>
 
-      <div id="sources-list" style="margin-top:.5rem">
-        <div class="empty-state">No sources added yet.</div>
-      </div>
+        <div id="sources-list" style="margin-top:.5rem">
+          <div class="empty-state">No sources added yet.</div>
+        </div>
 
-      <!-- Global update controls -->
-      <div id="update-controls" class="update-controls">
-        <span id="update-count-badge" class="update-count-badge"></span>
-        <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
-        <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
+        <!-- Global update controls -->
+        <div id="update-controls" class="update-controls">
+          <span id="update-count-badge" class="update-count-badge"></span>
+          <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
+          <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
+        </div>
       </div>
     </section>
 
-    <!-- PAYLOADS -->
-    <section class="card">
-      <div class="card-header-row">
-        <h2 class="card-title">Payloads</h2>
+    <!-- PAYLOADS (collapsible) -->
+    <section class="card collapsible" id="section-payloads">
+      <div class="card-header-row collapse-toggle" data-section="payloads">
+        <h2 class="card-title">Payloads <span class="collapse-summary" id="summary-payloads"></span></h2>
         <div class="row-gap">
           <button id="btn-refresh-payloads" class="btn btn-sm">↻</button>
           <label class="btn btn-sm">
-            + Add Payload
+            + Add
             <input type="file" id="payload-upload" accept=".lua,.elf" multiple style="display:none" />
           </label>
+          <span class="collapse-icon" aria-hidden="true">▲</span>
         </div>
       </div>
+      <div class="collapse-body">
 
-      <!-- Filter tabs: All / ⭐ Favorites / ELF / LUA -->
-      <div id="payload-filters" class="payload-filters"></div>
+        <!-- Filter tabs: All / ⭐ Favorites / ELF / LUA -->
+        <div id="payload-filters" class="payload-filters"></div>
 
-      <div class="payload-toolbar">
-        <label class="p-select-all-label">
-          <input type="checkbox" id="payload-select-all" />
-          <span class="p-select-all-text">Select all</span>
-        </label>
-        <input type="search" id="payload-search" class="input search-input"
-          placeholder="Search payloads…" autocomplete="off" spellcheck="false" />
-      </div>
-
-      <!-- Bulk action bar (hidden when no selection) -->
-      <div id="bulk-action-bar" class="bulk-action-bar" style="display:none">
-        <span id="bulk-count" class="bulk-count">0 selected</span>
-        <button id="btn-bulk-deselect" class="btn btn-sm">Deselect All</button>
-        <button id="btn-bulk-delete" class="btn btn-sm btn-danger">✕ Delete Selected</button>
-      </div>
-
-      <div id="upload-progress" style="display:none;margin-bottom:.7rem">
-        <div class="progress-bar"><div id="upload-bar" class="progress-fill"></div></div>
-        <span id="upload-label" style="font-size:.8rem;color:var(--muted)">Uploading …</span>
-      </div>
-
-      <div id="payload-list" class="payload-list">
-        <div class="empty-state">Loading …</div>
-      </div>
-    </section>
-
-    <!-- AUTO-LOAD BUILDER -->
-    <section id="builder-card" class="card">
-      <h2 class="card-title">Auto-Load Builder</h2>
-
-      <div class="builder-add-btns">
-        <button id="btn-add-payload" class="btn btn-sm btn-primary">＋ Payload</button>
-        <button id="btn-add-delay"   class="btn btn-sm">＋ Delay</button>
-        <button id="btn-add-wait"    class="btn btn-sm">＋ Wait Port</button>
-      </div>
-
-      <!-- Payload panel -->
-      <div id="panel-payload" class="add-panel" style="display:none">
-        <input type="search" id="builder-payload-search" class="input search-input"
-          placeholder="Search payloads…" autocomplete="off" spellcheck="false"
-          style="margin-bottom:.4rem" />
-        <select id="panel-payload-select" class="input select" style="margin-bottom:.4rem">
-          <option value="">– Select a payload –</option>
-        </select>
-        <div class="row-gap">
-          <input type="number" id="panel-payload-port" class="input advanced-only" placeholder="Port (auto)" min="1" max="65535" />
-          <button id="btn-panel-payload-ok" class="btn btn-primary btn-sm advanced-only">Add</button>
-          <button id="btn-panel-payload-x"  class="btn btn-sm">✕ Close</button>
+        <div class="payload-toolbar">
+          <label class="p-select-all-label">
+            <input type="checkbox" id="payload-select-all" />
+            <span class="p-select-all-text">Select all</span>
+          </label>
+          <input type="search" id="payload-search" class="input search-input"
+            placeholder="Search payloads…" autocomplete="off" spellcheck="false" />
         </div>
-      </div>
 
-      <!-- Delay panel -->
-      <div id="panel-delay" class="add-panel" style="display:none">
-        <div class="delay-presets">
-          <button class="btn btn-sm delay-preset" data-ms="1000">1s</button>
-          <button class="btn btn-sm delay-preset" data-ms="2000">2s</button>
-          <button class="btn btn-sm delay-preset" data-ms="3000">3s</button>
-          <button class="btn btn-sm delay-preset" data-ms="5000">5s</button>
+        <!-- Bulk action bar (hidden when no selection) -->
+        <div id="bulk-action-bar" class="bulk-action-bar" style="display:none">
+          <span id="bulk-count" class="bulk-count">0 selected</span>
+          <button id="btn-bulk-deselect" class="btn btn-sm">Deselect All</button>
+          <button id="btn-bulk-delete" class="btn btn-sm btn-danger">✕ Delete Selected</button>
         </div>
-        <div class="row-gap" style="margin-top:.4rem">
-          <input type="number" id="panel-delay-ms" class="input" placeholder="Custom ms …" min="1" />
-          <button id="btn-panel-delay-ok" class="btn btn-primary btn-sm">＋</button>
-          <button id="btn-panel-delay-x"  class="btn btn-sm">✕</button>
+
+        <div id="upload-progress" style="display:none;margin-bottom:.7rem">
+          <div class="progress-bar"><div id="upload-bar" class="progress-fill"></div></div>
+          <span id="upload-label" style="font-size:.8rem;color:var(--muted)">Uploading …</span>
         </div>
-      </div>
 
-      <!-- Wait panel -->
-      <div id="panel-wait" class="add-panel" style="display:none">
-        <div class="row-gap">
-          <div style="flex:1">
-            <label class="field-label" for="panel-wait-port">Port</label>
-            <input type="number" id="panel-wait-port" class="input" value="9021" min="1" max="65535" />
-          </div>
-          <div style="flex:1">
-            <label class="field-label" for="panel-wait-to">Timeout (s)</label>
-            <input type="number" id="panel-wait-to" class="input" value="60" min="1" />
-          </div>
-          <div style="flex:1">
-            <label class="field-label" for="panel-wait-interval">Interval (ms)</label>
-            <input type="number" id="panel-wait-interval" class="input" value="500" min="100" />
-          </div>
-        </div>
-        <div class="row-gap" style="margin-top:.4rem">
-          <button id="btn-panel-wait-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
-          <button id="btn-panel-wait-x"  class="btn btn-sm">✕</button>
-        </div>
-      </div>
-
-      <hr class="divider" />
-
-      <div id="builder-steps" class="builder-steps">
-        <div class="empty-state">No steps yet. Choose a step type above.</div>
-      </div>
-
-      <div style="margin-top:.75rem">
-        <div class="row-gap builder-footer">
-          <input type="text" id="builder-profile-name" class="input"
-            placeholder="Profile name" />
-          <button id="btn-builder-save" class="btn btn-secondary" title="Save as profile">💾</button>
-          <button id="btn-builder-run"  class="btn btn-primary btn-xl">▶ Run</button>
+        <div id="payload-list" class="payload-list">
+          <div class="empty-state">Loading …</div>
         </div>
       </div>
     </section>
 
-    <!-- SAVED PROFILES -->
-    <section class="card">
-      <div class="card-header-row">
-        <h2 class="card-title">Saved Profiles</h2>
-        <button id="btn-refresh-profiles" class="btn btn-sm">↻</button>
+    <!-- AUTO-LOAD BUILDER (collapsible) -->
+    <section id="builder-card" class="card collapsible" id="section-builder">
+      <div class="card-header-row collapse-toggle" data-section="builder">
+        <h2 class="card-title">Auto-Load Builder <span class="collapse-summary" id="summary-builder"></span></h2>
+        <span class="collapse-icon" aria-hidden="true">▲</span>
       </div>
+      <div class="collapse-body">
 
-      <label class="checkbox-label" style="margin-bottom:.75rem">
-        <input type="checkbox" id="continue-on-error" />
-        Continue on error
-      </label>
-
-      <div id="profile-list" class="profile-list">
-        <div class="empty-state">No profiles saved.</div>
-      </div>
-    </section>
-
-    <!-- PORT CHECK -->
-    <section class="card">
-      <h2 class="card-title">Port Check</h2>
-      <div class="port-check-grid">
-        <div>
-          <label class="field-label" for="check-port">Port</label>
-          <input type="number" id="check-port" class="input" value="9021" min="1" max="65535" />
+        <div class="builder-add-btns">
+          <button id="btn-add-payload" class="btn btn-sm btn-primary">＋ Payload</button>
+          <button id="btn-add-delay"   class="btn btn-sm">＋ Delay</button>
+          <button id="btn-add-wait"    class="btn btn-sm">＋ Wait Port</button>
         </div>
-        <div>
-          <label class="field-label" for="check-interval">Interval (ms)</label>
-          <input type="number" id="check-interval" class="input" value="500" min="100" />
-        </div>
-        <div>
-          <label class="field-label" for="check-timeout">Timeout (s)</label>
-          <input type="number" id="check-timeout" class="input" value="10" min="1" />
-        </div>
-      </div>
-      <div class="row-gap" style="margin-top:.6rem">
-        <button id="btn-check-once" class="btn btn-primary"   style="flex:1">Check Once</button>
-        <button id="btn-wait-port"  class="btn btn-secondary" style="flex:1">Wait Until Reachable</button>
-      </div>
-      <div id="port-check-result" style="display:none;margin-top:.7rem"></div>
-    </section>
 
-    <!-- PORT TIMING ANALYSIS -->
-    <section class="card">
-      <div class="card-header-row">
-        <h2 class="card-title">Port Timing Analysis</h2>
-        <button onclick="clearTimingStats()" class="btn btn-sm" title="Clear timing data">✕ Clear</button>
-      </div>
-      <p class="section-hint">Tracks how long each port takes to become reachable across runs.</p>
-      <div id="timing-stats"><p class="section-hint">No timing data yet.</p></div>
-      <div class="row-gap" style="margin-top:.6rem">
-        <input type="number" id="timing-port-input" class="input" value="9026" min="1" max="65535" style="width:100px" />
-        <button id="btn-timing-analyze" onclick="analyzePort()" class="btn btn-primary btn-sm" style="flex:1">▶ Analyze</button>
-      </div>
-    </section>
-
-    <!-- STATUS -->
-    <section class="card">
-      <div class="card-header-row">
-        <h2 class="card-title">Status</h2>
-        <div class="row-gap">
-          <select id="log-filter" class="input select" style="font-size:.78rem" onchange="applyLogFilter()">
-            <option value="all">All logs</option>
-            <option value="port">Port timing</option>
-            <option value="payload">Payload execution</option>
+        <!-- Payload panel -->
+        <div id="panel-payload" class="add-panel" style="display:none">
+          <input type="search" id="builder-payload-search" class="input search-input"
+            placeholder="Search payloads…" autocomplete="off" spellcheck="false"
+            style="margin-bottom:.4rem" />
+          <select id="panel-payload-select" class="input select" style="margin-bottom:.4rem">
+            <option value="">– Select a payload –</option>
           </select>
-          <button onclick="exportLog('txt')" class="btn btn-sm">⬇ TXT</button>
-          <button onclick="exportLog('json')" class="btn btn-sm">⬇ JSON</button>
-          <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+          <div class="row-gap">
+            <input type="number" id="panel-payload-port" class="input advanced-only" placeholder="Port (auto)" min="1" max="65535" />
+            <button id="btn-panel-payload-ok" class="btn btn-primary btn-sm advanced-only">Add</button>
+            <button id="btn-panel-payload-x"  class="btn btn-sm">✕ Close</button>
+          </div>
+        </div>
+
+        <!-- Delay panel -->
+        <div id="panel-delay" class="add-panel" style="display:none">
+          <div class="delay-presets">
+            <button class="btn btn-sm delay-preset" data-ms="1000">1s</button>
+            <button class="btn btn-sm delay-preset" data-ms="2000">2s</button>
+            <button class="btn btn-sm delay-preset" data-ms="3000">3s</button>
+            <button class="btn btn-sm delay-preset" data-ms="5000">5s</button>
+          </div>
+          <div class="row-gap" style="margin-top:.4rem">
+            <input type="number" id="panel-delay-ms" class="input" placeholder="Custom ms …" min="1" />
+            <button id="btn-panel-delay-ok" class="btn btn-primary btn-sm">＋</button>
+            <button id="btn-panel-delay-x"  class="btn btn-sm">✕</button>
+          </div>
+        </div>
+
+        <!-- Wait panel -->
+        <div id="panel-wait" class="add-panel" style="display:none">
+          <div class="row-gap">
+            <div style="flex:1">
+              <label class="field-label" for="panel-wait-port">Port</label>
+              <input type="number" id="panel-wait-port" class="input" value="9021" min="1" max="65535" />
+            </div>
+            <div style="flex:1">
+              <label class="field-label" for="panel-wait-to">Timeout (s)</label>
+              <input type="number" id="panel-wait-to" class="input" value="60" min="1" />
+            </div>
+            <div style="flex:1">
+              <label class="field-label" for="panel-wait-interval">Interval (ms)</label>
+              <input type="number" id="panel-wait-interval" class="input" value="500" min="100" />
+            </div>
+          </div>
+          <div class="row-gap" style="margin-top:.4rem">
+            <button id="btn-panel-wait-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
+            <button id="btn-panel-wait-x"  class="btn btn-sm">✕</button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div id="builder-steps" class="builder-steps">
+          <div class="empty-state">No steps yet. Choose a step type above.</div>
+        </div>
+
+        <div style="margin-top:.75rem">
+          <div class="row-gap builder-footer">
+            <input type="text" id="builder-profile-name" class="input"
+              placeholder="Profile name" />
+            <button id="btn-builder-save" class="btn btn-secondary" title="Save as profile">💾</button>
+            <button id="btn-builder-run"  class="btn btn-primary btn-xl">▶ Run</button>
+          </div>
         </div>
       </div>
-      <div id="status-log" class="status-log">
-        <div class="log-entry log-info"><span class="log-ts">--:--:--</span> Ready …</div>
+    </section>
+
+    <!-- SAVED PROFILES (collapsible) -->
+    <section class="card collapsible" id="section-profiles">
+      <div class="card-header-row collapse-toggle" data-section="profiles">
+        <h2 class="card-title">Saved Profiles <span class="collapse-summary" id="summary-profiles"></span></h2>
+        <div class="row-gap">
+          <button id="btn-refresh-profiles" class="btn btn-sm">↻</button>
+          <span class="collapse-icon" aria-hidden="true">▲</span>
+        </div>
+      </div>
+      <div class="collapse-body">
+        <label class="checkbox-label" style="margin-bottom:.75rem">
+          <input type="checkbox" id="continue-on-error" />
+          Continue on error
+        </label>
+        <div id="profile-list" class="profile-list">
+          <div class="empty-state">No profiles saved.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOW & PORT ANALYSIS (collapsible) -->
+    <section class="card collapsible" id="section-analysis">
+      <div class="card-header-row collapse-toggle" data-section="analysis">
+        <h2 class="card-title">Flow &amp; Port Analysis <span class="collapse-summary" id="summary-analysis"></span></h2>
+        <div class="row-gap">
+          <button onclick="clearFlowRuns()" class="btn btn-sm" title="Clear flow history">✕ Clear</button>
+          <span class="collapse-icon" aria-hidden="true">▲</span>
+        </div>
+      </div>
+      <div class="collapse-body">
+
+        <!-- Flow Analyzer controls -->
+        <div class="flow-controls">
+          <label class="checkbox-label">
+            <input type="checkbox" id="flow-safe-mode" checked />
+            Safe Mode — don't send real payloads
+          </label>
+          <button id="btn-analyze-flow" class="btn btn-primary" style="width:100%;margin-top:.5rem"
+            onclick="startFlowAnalysis()">▶ Analyze Flow</button>
+        </div>
+
+        <!-- Timeline output -->
+        <div id="flow-timeline" class="flow-timeline">
+          <p class="section-hint">Run Analyze Flow to see step-by-step timing.</p>
+        </div>
+
+        <!-- Port timing stats -->
+        <div style="margin-top:.75rem">
+          <div class="card-header-row" style="margin-bottom:.4rem">
+            <span class="section-subheader">Port Timing Stats</span>
+            <button onclick="clearTimingStats()" class="btn btn-xs" title="Clear port timing data">✕ Clear</button>
+          </div>
+          <div id="timing-stats"><p class="section-hint">No timing data yet.</p></div>
+          <div class="row-gap" style="margin-top:.5rem">
+            <input type="number" id="timing-port-input" class="input" value="9026" min="1" max="65535"
+              style="width:90px" title="Port to analyze" />
+            <button id="btn-timing-analyze" onclick="analyzePort()" class="btn btn-sm" style="flex:1">▶ Analyze Port</button>
+          </div>
+        </div>
+
+        <!-- Manual port check (compact) -->
+        <div style="margin-top:.75rem">
+          <span class="section-subheader">Manual Port Check</span>
+          <div class="port-check-grid" style="margin-top:.4rem">
+            <div>
+              <label class="field-label" for="check-port">Port</label>
+              <input type="number" id="check-port" class="input" value="9021" min="1" max="65535" />
+            </div>
+            <div>
+              <label class="field-label" for="check-interval">Interval (ms)</label>
+              <input type="number" id="check-interval" class="input" value="500" min="100" />
+            </div>
+            <div>
+              <label class="field-label" for="check-timeout">Timeout (s)</label>
+              <input type="number" id="check-timeout" class="input" value="10" min="1" />
+            </div>
+          </div>
+          <div class="row-gap" style="margin-top:.5rem">
+            <button id="btn-check-once" class="btn btn-primary btn-sm" style="flex:1">Check Once</button>
+            <button id="btn-wait-port"  class="btn btn-sm"             style="flex:1">Wait Until Reachable</button>
+          </div>
+          <div id="port-check-result" style="display:none;margin-top:.6rem"></div>
+        </div>
+
+        <!-- Execution log -->
+        <div style="margin-top:.75rem">
+          <div class="card-header-row" style="margin-bottom:.3rem">
+            <span class="section-subheader">Execution Log</span>
+            <div class="row-gap">
+              <select id="log-filter" class="input select" style="font-size:.78rem" onchange="applyLogFilter()">
+                <option value="all">All logs</option>
+                <option value="port">Port timing</option>
+                <option value="payload">Payload execution</option>
+              </select>
+              <button onclick="exportLog('txt')" class="btn btn-xs">⬇ TXT</button>
+              <button id="btn-clear-log" class="btn btn-xs">Clear</button>
+            </div>
+          </div>
+          <div id="status-log" class="status-log">
+            <div class="log-entry log-info"><span class="log-ts">--:--:--</span> Ready …</div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -333,8 +377,8 @@
         <input type="text" id="new-device-ip" class="input" placeholder="192.168.1.100" inputmode="decimal" />
       </div>
       <div class="row-gap">
-        <button id="btn-add-device"          class="btn btn-primary" style="flex:1">Add</button>
-        <button id="btn-close-device-modal"  class="btn"             style="flex:1">Close</button>
+        <button id="btn-add-device"         class="btn btn-primary" style="flex:1">Add</button>
+        <button id="btn-close-device-modal" class="btn"             style="flex:1">Close</button>
       </div>
     </div>
   </div>
@@ -352,6 +396,8 @@
   <script src="static/js/PayloadSources.js"></script>
   <script src="static/js/ConfigBackup.js"></script>
   <script src="static/js/PortTiming.js"></script>
+  <script src="static/js/FlowAnalysis.js"></script>
+  <script src="static/js/CollapsibleSections.js"></script>
   <script src="static/js/init.js"></script>
 </body>
 </html>

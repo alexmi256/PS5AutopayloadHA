@@ -766,3 +766,74 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   font-size: .73rem; padding: .15rem .45rem; line-height: 1.4;
   border-radius: .25rem;
 }
+
+/* ── Collapsible sections ──────────────────────────────────────── */
+.collapse-toggle {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.collapse-toggle:hover .card-title { opacity: .85 }
+
+.collapse-body {
+  overflow: hidden;
+  transition: opacity .18s ease;
+}
+.collapse-body.collapsed {
+  display: none;
+}
+
+.collapse-icon {
+  font-size: .78rem; color: var(--dim);
+  flex-shrink: 0; margin-left: .2rem;
+  transition: transform .18s ease;
+}
+
+.collapse-summary {
+  font-size: .75rem; font-weight: 400;
+  color: var(--dim); margin-left: .5rem;
+  vertical-align: middle;
+}
+
+/* ── Section sub-header (inside card body) ──────────────────────── */
+.section-subheader {
+  font-size: .82rem; font-weight: 600;
+  color: var(--fg); letter-spacing: .01em;
+}
+
+/* ── Flow Analysis controls ─────────────────────────────────────── */
+.flow-controls {
+  padding: .5rem; border: 1px solid var(--border);
+  border-radius: .4rem; margin-bottom: .6rem;
+  background: var(--card-bg);
+}
+
+/* ── Flow Timeline ──────────────────────────────────────────────── */
+.flow-timeline {
+  font-family: var(--font-mono, monospace);
+  font-size: .8rem;
+  background: var(--log-bg, #1a1a1a);
+  border: 1px solid var(--border);
+  border-radius: .35rem;
+  padding: .5rem .65rem;
+  max-height: 220px;
+  overflow-y: auto;
+  line-height: 1.55;
+}
+.flow-tl-row       { display: flex; gap: .55rem; align-items: baseline }
+.flow-tl-ts        { color: var(--dim); flex-shrink: 0; font-size: .75rem }
+.flow-tl-msg       { flex: 1 }
+.flow-tl-info      { color: var(--fg) }
+.flow-tl-success   { color: var(--green) }
+.flow-tl-warn      { color: var(--log-warn) }
+.flow-tl-error     { color: var(--log-error, #f56) }
+
+/* ── Efficiency hints ───────────────────────────────────────────── */
+.flow-hints  { margin-top: .5rem; border-top: 1px solid var(--border); padding-top: .4rem }
+.flow-hint   { font-size: .78rem; color: var(--log-warn); padding: .1rem 0 }
+
+/* ── Mobile: larger tap targets for collapse toggles ────────────── */
+@media (max-width: 480px) {
+  .collapse-toggle { min-height: 44px; align-items: center }
+  .flow-timeline   { max-height: 160px }
+}

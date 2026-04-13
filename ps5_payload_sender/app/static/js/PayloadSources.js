@@ -17,6 +17,7 @@ async function refreshSources() {
     const data = await api('/api/sources');
     state.sources = data.sources || [];
     renderSourcesList();
+    if (typeof updateSourcesSummary === 'function') updateSourcesSummary();
   } catch (e) { log('Load sources: ' + e.message, 'error'); }
 }
 

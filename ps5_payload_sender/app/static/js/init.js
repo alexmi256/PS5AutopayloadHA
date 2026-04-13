@@ -108,6 +108,7 @@ async function init() {
   await loadDevicesFromServer();
   await loadPersistedState();
   await refreshSources();
+  updateSourcesSummary();
   try {
     const cfg = await api('/api/config');
     const ip  = document.getElementById('ps5-ip');
@@ -116,8 +117,13 @@ async function init() {
   await loadVersion();
   renderPayloadFilters();
   await refreshPayloads();
+  updatePayloadsSummary();
+  updateBuilderSummary();
   await refreshProfiles();
+  updateProfilesSummary();
   await loadTimingStats();
+  await loadFlowRuns();
+  initCollapsible();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();
