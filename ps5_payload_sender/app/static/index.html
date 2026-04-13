@@ -19,6 +19,8 @@
         <span class="header-subtitle">Home Assistant Add-on</span>
       </div>
       <span id="version-badge" class="version-badge">v–</span>
+      <button onclick="exportConfig()" class="btn btn-sm" title="Export config backup">⬇ Export</button>
+      <button onclick="importConfig()" class="btn btn-sm" title="Import config backup">⬆ Import</button>
       <button id="btn-theme" class="btn btn-icon-btn" title="Light / Dark">☀</button>
       <span id="ws-indicator" class="ws-dot ws-offline" title="WebSocket"></span>
     </div>
@@ -274,11 +276,34 @@
       <div id="port-check-result" style="display:none;margin-top:.7rem"></div>
     </section>
 
+    <!-- PORT TIMING ANALYSIS -->
+    <section class="card">
+      <div class="card-header-row">
+        <h2 class="card-title">Port Timing Analysis</h2>
+        <button onclick="clearTimingStats()" class="btn btn-sm" title="Clear timing data">✕ Clear</button>
+      </div>
+      <p class="section-hint">Tracks how long each port takes to become reachable across runs.</p>
+      <div id="timing-stats"><p class="section-hint">No timing data yet.</p></div>
+      <div class="row-gap" style="margin-top:.6rem">
+        <input type="number" id="timing-port-input" class="input" value="9026" min="1" max="65535" style="width:100px" />
+        <button id="btn-timing-analyze" onclick="analyzePort()" class="btn btn-primary btn-sm" style="flex:1">▶ Analyze</button>
+      </div>
+    </section>
+
     <!-- STATUS -->
     <section class="card">
       <div class="card-header-row">
         <h2 class="card-title">Status</h2>
-        <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+        <div class="row-gap">
+          <select id="log-filter" class="input select" style="font-size:.78rem" onchange="applyLogFilter()">
+            <option value="all">All logs</option>
+            <option value="port">Port timing</option>
+            <option value="payload">Payload execution</option>
+          </select>
+          <button onclick="exportLog('txt')" class="btn btn-sm">⬇ TXT</button>
+          <button onclick="exportLog('json')" class="btn btn-sm">⬇ JSON</button>
+          <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+        </div>
       </div>
       <div id="status-log" class="status-log">
         <div class="log-entry log-info"><span class="log-ts">--:--:--</span> Ready …</div>
@@ -318,6 +343,8 @@
   <script src="static/js/AutoLoadBuilder.js"></script>
   <script src="static/js/ProfileManager.js"></script>
   <script src="static/js/PayloadSources.js"></script>
+  <script src="static/js/ConfigBackup.js"></script>
+  <script src="static/js/PortTiming.js"></script>
   <script src="static/js/init.js"></script>
 </body>
 </html>

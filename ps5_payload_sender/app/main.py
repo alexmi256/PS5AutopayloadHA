@@ -71,8 +71,9 @@ from ha_client import (
     reload_integration,
     write_ha_services_yaml,
 )
-from github_client import download as gh_download, get_releases as gh_get_releases
+from github_client import download_payload as gh_download_payload, get_releases as gh_get_releases
 from models import (
+    AnalyzePortRequest,
     AutoloadRequest,
     DeviceList,
     ImportPayloadRequest,
@@ -84,18 +85,22 @@ from models import (
 )
 from payload_sender import resolve_port, send_payload
 from port_checker import check_port, wait_for_port
+import port_timing
 from storage import (
+    build_backup,
     list_payloads,
     list_profiles,
     load_devices,
     load_payload_meta,
     load_sources,
     load_ui_state,
+    restore_backup,
     save_devices,
     save_payload_meta,
     save_sources,
     save_ui_state,
     setup_storage,
+    trim_versions,
 )
 from websocket_manager import manager
 
@@ -358,20 +363,24 @@ async def api_source_releases(repo: str, asset: str = ""):
 
 @app.post("/api/payloads/import")
 async def api_import_payload(req: ImportPayloadRequest):
-    safe = Path(req.asset_name).name
-    if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
-        raise HTTPException(400, "Only .elf and .lua files allowed")
     loop = asyncio.get_running_loop()
     try:
-        data = await loop.run_in_executor(executor, gh_download, req.download_url)
+        data, actual_name = await loop.run_in_executor(
+            executor, gh_download_payload, req.download_url, Path(req.asset_name).name
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     except Exception as exc:
         raise HTTPException(502, f"Download failed: {exc}")
+    safe = Path(actual_name).name
+    if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+        raise HTTPException(400, "Only .elf and .lua files allowed")
     (PAYLOAD_DIR / safe).write_bytes(data)
     meta = load_payload_meta()
-    stored_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    raw_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
     meta[safe] = {
         "repo": req.repo, "asset": req.asset_name,
-        "version": req.version, "versions": stored_versions,
+        "version": req.version, "versions": trim_versions(raw_versions),
     }
     save_payload_meta(meta)
     await manager.status(f"'{safe}' imported from {req.repo} {req.version}", level="success")
@@ -388,15 +397,20 @@ async def api_switch_version(filename: str, req: SwitchVersionRequest):
         backup_version = (load_payload_meta().get(safe) or {}).get("version", "")
     loop = asyncio.get_running_loop()
     try:
-        data = await loop.run_in_executor(executor, gh_download, req.download_url)
+        data, _ = await loop.run_in_executor(
+            executor, gh_download_payload, req.download_url, safe
+        )
     except Exception as exc:
         raise HTTPException(502, f"Download failed: {exc}")
     dest.write_bytes(data)
     meta = load_payload_meta()
+    existing = meta.get(safe) or {}
+    existing_versions = existing.get("versions", [])
     meta[safe] = {
-        **(meta.get(safe) or {}),
+        **existing,
         "repo": req.repo, "asset": req.asset_name,
         "version": req.version, "backup_version": backup_version,
+        "versions": trim_versions(existing_versions),
     }
     save_payload_meta(meta)
     await manager.status(f"'{safe}' switched to {req.version}", level="success")
@@ -700,6 +714,140 @@ async def ws_endpoint(ws: WebSocket):
                 pass
     except WebSocketDisconnect:
         manager.disconnect(ws)
+
+
+# ---------------------------------------------------------------------------
+# API – Config Backup / Restore
+# ---------------------------------------------------------------------------
+
+@app.get("/api/backup")
+async def api_export_backup():
+    """Download full configuration as ps5-autopayload-backup.json."""
+    from fastapi.responses import Response
+    data = json.dumps(build_backup(), ensure_ascii=False, indent=2).encode()
+    return Response(
+        content=data,
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="ps5-autopayload-backup.json"'},
+    )
+
+
+@app.post("/api/backup/restore")
+async def api_import_backup(request: Request):
+    try:
+        data = await request.json()
+        if not isinstance(data, dict) or data.get("version") != 1:
+            raise HTTPException(400, "Invalid backup file")
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    restore_backup(data)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, write_ha_services_yaml)
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# API – Port Timing
+# ---------------------------------------------------------------------------
+
+@app.get("/api/timing")
+async def api_get_timing():
+    return {"stats": port_timing.get_stats()}
+
+
+@app.post("/api/timing/record")
+async def api_record_timing(request: Request):
+    body = await request.json()
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        executor,
+        port_timing.record,
+        int(body.get("port", 0)),
+        int(body.get("duration_ms", 0)),
+        body.get("start", ""),
+        body.get("ready", ""),
+    )
+    return {"success": True}
+
+
+@app.post("/api/timing/analyze")
+async def api_analyze_timing(req: AnalyzePortRequest):
+    """Check port, record timing, return result + stats."""
+    import time
+    start_ts = time.time()
+    start_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+    async def _prog(elapsed, total):
+        await manager.status(
+            f"[Analyze] Waiting for port {req.port} … ({elapsed:.0f}/{total:.0f}s)",
+            waiting_port=req.port,
+        )
+
+    ok = await wait_for_port(
+        req.host, req.port,
+        total_timeout=req.timeout, interval=req.interval,
+        connect_timeout=2.0, progress_callback=_prog,
+    )
+    duration_ms = int((time.time() - start_ts) * 1000)
+    ready_iso = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+
+    if ok:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            executor, port_timing.record, req.port, duration_ms, start_iso, ready_iso
+        )
+        await manager.status(
+            f"[Analyze] Port {req.port} reachable in {duration_ms / 1000:.1f}s", level="success"
+        )
+    else:
+        await manager.status(f"[Analyze] Port {req.port} not reachable (timeout)", level="error")
+
+    return {
+        "reachable": ok,
+        "port": req.port,
+        "duration_ms": duration_ms,
+        "stats": port_timing.get_port_stats(req.port),
+    }
+
+
+@app.delete("/api/timing")
+async def api_clear_timing():
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, port_timing.clear)
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# API – Log export  (history kept client-side; export endpoint receives it)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/logs/export")
+async def api_export_logs(request: Request):
+    """
+    Receive log entries from frontend, return as downloadable file.
+    Body: { "entries": [...], "format": "txt" | "json" }
+    """
+    from fastapi.responses import Response
+    body = await request.json()
+    entries = body.get("entries", [])
+    fmt = body.get("format", "txt")
+
+    if fmt == "json":
+        content = json.dumps(entries, ensure_ascii=False, indent=2).encode()
+        mime, ext = "application/json", "json"
+    else:
+        lines = [f"[{e.get('ts', '')}] {e.get('msg', '')}" for e in entries]
+        content = "\n".join(lines).encode()
+        mime, ext = "text/plain", "txt"
+
+    from datetime import datetime
+    stamp = datetime.utcnow().strftime("%Y-%m-%d-%H%M")
+    filename = f"ps5-autopayload-log-{stamp}.{ext}"
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------

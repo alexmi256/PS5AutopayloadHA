@@ -117,6 +117,7 @@ async function init() {
   renderPayloadFilters();
   await refreshPayloads();
   await refreshProfiles();
+  await loadTimingStats();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();

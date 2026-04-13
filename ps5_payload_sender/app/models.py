@@ -52,3 +52,10 @@ class SwitchVersionRequest(BaseModel):
     asset_name: str
     download_url: str
     version: str
+
+
+class AnalyzePortRequest(BaseModel):
+    host: str
+    port: int
+    timeout: float = 30.0
+    interval: float = 0.5

@@ -29,6 +29,11 @@ OLD_DEVICES_FILE = Path("/data/devices.json")
 
 # ── Misc ──────────────────────────────────────────────────────────
 APP_VERSION = "1.0.0-dev"
+MAX_PAYLOAD_VERSIONS  = 3     # versions kept per payload
+MAX_TIMING_ENTRIES    = 10    # timing samples kept per port
+MAX_LOG_ENTRIES       = 500   # log entries kept in history
+
+TIMING_FILE = CONFIG_BASE / "port_timing.json"
 GITHUB_RAW_CONFIG = (
     "https://raw.githubusercontent.com/cosmicflow2512/PS5AutopayloadHA"
     "/main/ps5_payload_sender/config.yaml"

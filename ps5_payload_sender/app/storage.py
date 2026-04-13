@@ -16,6 +16,7 @@ from config import (
     CONFIG_BASE,
     DEVICES_FILE,
     HIDDEN_PROFILES,
+    MAX_PAYLOAD_VERSIONS,
     OLD_DEVICES_FILE,
     OLD_PAYLOAD_DIR,
     OLD_STATE_FILE,
@@ -169,3 +170,54 @@ def list_profiles() -> List[str]:
         f.name for f in sorted(PROFILES_DIR.iterdir())
         if f.is_file() and f.suffix.lower() == ".txt" and f.name not in HIDDEN_PROFILES
     ]
+
+
+# ── Version limit helper ──────────────────────────────────────────
+
+def trim_versions(versions: list) -> list:
+    """Keep only the newest MAX_PAYLOAD_VERSIONS entries."""
+    return versions[:MAX_PAYLOAD_VERSIONS]
+
+
+# ── Config backup / restore ───────────────────────────────────────
+
+def build_backup() -> dict:
+    """Collect full configuration into a single serialisable dict."""
+    profiles: Dict[str, str] = {}
+    if PROFILES_DIR.exists():
+        for p in PROFILES_DIR.iterdir():
+            if p.is_file() and p.suffix.lower() == ".txt" and p.name not in HIDDEN_PROFILES:
+                profiles[p.name] = p.read_text(encoding="utf-8", errors="replace")
+
+    return {
+        "version": 1,
+        "state":        load_ui_state(),
+        "devices":      load_devices(),
+        "sources":      load_sources(),
+        "payload_meta": load_payload_meta(),
+        "profiles":     profiles,
+    }
+
+
+def restore_backup(data: dict) -> None:
+    """Restore all configuration from a backup dict (after auto-saving current)."""
+    # Auto-backup current config first
+    _auto_backup = CONFIG_BASE / "pre_restore_backup.json"
+    _auto_backup.write_text(
+        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    if "state" in data:
+        save_ui_state(data["state"])
+    if "devices" in data:
+        save_devices(data["devices"])
+    if "sources" in data:
+        save_sources(data["sources"])
+    if "payload_meta" in data:
+        save_payload_meta(data["payload_meta"])
+    if "profiles" in data:
+        PROFILES_DIR.mkdir(exist_ok=True)
+        for name, content in data["profiles"].items():
+            safe = Path(name).name
+            if safe.endswith(".txt"):
+                (PROFILES_DIR / safe).write_text(content, encoding="utf-8")

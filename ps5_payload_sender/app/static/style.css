@@ -711,3 +711,29 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   /* Quick Start tiles: allow smaller */
   .qs-tile-label { max-width: 130px }
 }
+
+/* ── Port Timing Analysis ──────────────────────────────────────── */
+.timing-row {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .35rem 0; border-bottom: 1px solid var(--border);
+}
+.timing-row:last-child { border-bottom: none }
+.timing-port  { font-weight: 700; min-width: 4.5rem; flex-shrink: 0 }
+.timing-stat  { font-size: .83rem; flex-shrink: 0 }
+.timing-muted { color: var(--dim) }
+.timing-count {
+  margin-left: auto; font-size: .78rem; color: var(--dim);
+  flex-shrink: 0; white-space: nowrap;
+}
+
+/* ── Log controls (filter + export) ──────────────────────────────── */
+.log-controls {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin-bottom: .4rem;
+}
+.log-controls .select { min-width: 9rem }
+
+/* ── Header backup buttons ─────────────────────────────────────── */
+.header-actions {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+}
