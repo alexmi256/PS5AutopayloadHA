@@ -20,6 +20,10 @@ import logging
 import logging.handlers
 from pathlib import Path
 
+import fnmatch
+import shutil
+import urllib.error
+
 import aiofiles
 import uvicorn
 from fastapi import (
@@ -40,6 +44,7 @@ from config import (
     APP_VERSION,
     ALLOWED_PAYLOAD_EXTENSIONS,
     CONFIG_BASE,
+    HIDDEN_PROFILES,
     HOST,
     PAYLOAD_DIR,
     PORT_CHECK_INTERVAL,
@@ -66,12 +71,16 @@ from ha_client import (
     reload_integration,
     write_ha_services_yaml,
 )
+from github_client import download as gh_download, get_releases as gh_get_releases
 from models import (
     AutoloadRequest,
     DeviceList,
+    ImportPayloadRequest,
     PortCheckRequest,
     SaveProfileRequest,
     SendRequest,
+    SourceAddRequest,
+    SwitchVersionRequest,
 )
 from payload_sender import resolve_port, send_payload
 from port_checker import check_port, wait_for_port
@@ -79,8 +88,12 @@ from storage import (
     list_payloads,
     list_profiles,
     load_devices,
+    load_payload_meta,
+    load_sources,
     load_ui_state,
     save_devices,
+    save_payload_meta,
+    save_sources,
     save_ui_state,
     setup_storage,
 )
@@ -243,11 +256,230 @@ async def api_upload(file: UploadFile = File(...)):
 
 @app.delete("/api/payloads/{filename}")
 async def api_delete_payload(filename: str):
-    p = PAYLOAD_DIR / Path(filename).name
+    safe = Path(filename).name
+    p = PAYLOAD_DIR / safe
     if not p.exists():
         raise HTTPException(404, "Not found")
     p.unlink()
+    meta = load_payload_meta()
+    if safe in meta:
+        del meta[safe]
+        save_payload_meta(meta)
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# API – Payload Sources (GitHub)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/sources")
+async def api_get_sources():
+    return {"sources": load_sources()}
+
+
+@app.post("/api/sources")
+async def api_add_source(req: SourceAddRequest):
+    parts = req.repo.strip().split("/")
+    if len(parts) != 2 or not all(p.strip() for p in parts):
+        raise HTTPException(400, "Invalid repository format. Use 'owner/repo'")
+    owner, repo_name = parts[0].strip(), parts[1].strip()
+    loop = asyncio.get_running_loop()
+    try:
+        assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise HTTPException(404, "Repository not found or has no releases")
+        raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
+    except Exception as exc:
+        raise HTTPException(502, f"Could not reach GitHub: {exc}")
+
+    if not assets:
+        raise HTTPException(404, "No .elf or .lua files found in any release")
+
+    if req.filter.strip():
+        assets = [a for a in assets if fnmatch.fnmatch(a["asset_name"], req.filter.strip())]
+        if not assets:
+            raise HTTPException(404, f"No payloads match filter '{req.filter}'")
+
+    slug = f"{owner}/{repo_name}"
+
+    # Build per-asset version list
+    asset_versions: dict = {}
+    for a in assets:
+        aname = a["asset_name"]
+        if aname not in asset_versions:
+            asset_versions[aname] = []
+        if not any(v["tag"] == a["tag"] for v in asset_versions[aname]):
+            asset_versions[aname].append({"tag": a["tag"], "download_url": a["download_url"]})
+
+    # Auto-link existing local payloads
+    meta = load_payload_meta()
+    auto_linked: list = []
+    for aname, versions in asset_versions.items():
+        if (PAYLOAD_DIR / aname).exists() and aname not in meta:
+            meta[aname] = {
+                "repo": slug, "asset": aname,
+                "version": versions[0]["tag"], "versions": versions,
+            }
+            auto_linked.append(aname)
+    if auto_linked:
+        save_payload_meta(meta)
+
+    sources = load_sources()
+    if not any(s["repo"] == slug for s in sources):
+        sources.append({"repo": slug, "filter": req.filter.strip()})
+        save_sources(sources)
+
+    return {"success": True, "repo": slug, "assets": assets, "auto_linked": auto_linked}
+
+
+@app.delete("/api/sources/{owner}/{repo_name}")
+async def api_delete_source(owner: str, repo_name: str):
+    slug = f"{owner}/{repo_name}"
+    save_sources([s for s in load_sources() if s["repo"] != slug])
+    return {"success": True}
+
+
+@app.get("/api/sources/releases")
+async def api_source_releases(repo: str, asset: str = ""):
+    parts = repo.strip().split("/")
+    if len(parts) != 2:
+        raise HTTPException(400, "Use 'owner/repo'")
+    owner, repo_name = parts
+    loop = asyncio.get_running_loop()
+    try:
+        assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+    except Exception as exc:
+        raise HTTPException(502, f"GitHub API error: {exc}")
+    if asset:
+        assets = [a for a in assets if a["asset_name"] == asset]
+    return {"releases": assets}
+
+
+@app.post("/api/payloads/import")
+async def api_import_payload(req: ImportPayloadRequest):
+    safe = Path(req.asset_name).name
+    if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+        raise HTTPException(400, "Only .elf and .lua files allowed")
+    loop = asyncio.get_running_loop()
+    try:
+        data = await loop.run_in_executor(executor, gh_download, req.download_url)
+    except Exception as exc:
+        raise HTTPException(502, f"Download failed: {exc}")
+    (PAYLOAD_DIR / safe).write_bytes(data)
+    meta = load_payload_meta()
+    stored_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    meta[safe] = {
+        "repo": req.repo, "asset": req.asset_name,
+        "version": req.version, "versions": stored_versions,
+    }
+    save_payload_meta(meta)
+    await manager.status(f"'{safe}' imported from {req.repo} {req.version}", level="success")
+    return {"success": True, "filename": safe, "size": len(data), "auto_port": resolve_port(safe)}
+
+
+@app.post("/api/payloads/{filename}/switch-version")
+async def api_switch_version(filename: str, req: SwitchVersionRequest):
+    safe = Path(filename).name
+    dest = PAYLOAD_DIR / safe
+    backup_version = ""
+    if dest.exists():
+        shutil.copy2(dest, PAYLOAD_DIR / f"{safe}.bak")
+        backup_version = (load_payload_meta().get(safe) or {}).get("version", "")
+    loop = asyncio.get_running_loop()
+    try:
+        data = await loop.run_in_executor(executor, gh_download, req.download_url)
+    except Exception as exc:
+        raise HTTPException(502, f"Download failed: {exc}")
+    dest.write_bytes(data)
+    meta = load_payload_meta()
+    meta[safe] = {
+        **(meta.get(safe) or {}),
+        "repo": req.repo, "asset": req.asset_name,
+        "version": req.version, "backup_version": backup_version,
+    }
+    save_payload_meta(meta)
+    await manager.status(f"'{safe}' switched to {req.version}", level="success")
+    return {"success": True, "filename": safe, "version": req.version, "backup_version": backup_version}
+
+
+@app.post("/api/payloads/{filename}/rollback")
+async def api_rollback(filename: str):
+    safe = Path(filename).name
+    dest   = PAYLOAD_DIR / safe
+    backup = PAYLOAD_DIR / f"{safe}.bak"
+    if not backup.exists():
+        raise HTTPException(404, "No backup found for this payload")
+    shutil.copy2(backup, dest)
+    meta = load_payload_meta()
+    m = meta.get(safe, {})
+    prev_ver, current_ver = m.get("backup_version", ""), m.get("version", "")
+    m["version"] = prev_ver
+    m["backup_version"] = current_ver
+    meta[safe] = m
+    save_payload_meta(meta)
+    await manager.status(f"'{safe}' rolled back to {prev_ver}", level="success")
+    return {"success": True, "filename": safe, "version": prev_ver}
+
+
+@app.get("/api/sources/check-updates")
+async def api_check_updates():
+    meta = load_payload_meta()
+    if not meta:
+        return {"updates": [], "checked": 0}
+    repos: dict = {}
+    for fname, m in meta.items():
+        repo = m.get("repo", "")
+        if repo:
+            repos.setdefault(repo, []).append(fname)
+    updates: list = []
+    loop = asyncio.get_running_loop()
+    for slug, filenames in repos.items():
+        parts = slug.split("/")
+        if len(parts) != 2:
+            continue
+        owner, repo_name = parts
+        try:
+            assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+            latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
+            for fname in filenames:
+                m = meta.get(fname, {})
+                current    = m.get("version", "")
+                asset_name = m.get("asset", fname)
+                latest     = latest_per_asset.get(asset_name)
+                if latest and latest["tag"] != current:
+                    updates.append({
+                        "filename": fname, "current_version": current,
+                        "latest_version": latest["tag"],
+                        "download_url": latest["download_url"],
+                        "repo": slug, "asset_name": asset_name,
+                    })
+        except Exception:
+            pass
+    return {"updates": updates, "checked": len(repos)}
+
+
+@app.get("/api/payloads/{filename}/usage")
+async def api_payload_usage(filename: str):
+    safe = Path(filename).name
+    used_in: list = []
+    if PROFILES_DIR.exists():
+        for profile in sorted(PROFILES_DIR.iterdir()):
+            if not profile.is_file() or profile.suffix.lower() != ".txt":
+                continue
+            if profile.name in HIDDEN_PROFILES:
+                continue
+            try:
+                for line in profile.read_text(encoding="utf-8", errors="replace").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.split()[0] == safe:
+                        used_in.append(profile.stem)
+                        break
+            except Exception:
+                pass
+    return {"filename": safe, "used_in": used_in}
 
 
 # ---------------------------------------------------------------------------

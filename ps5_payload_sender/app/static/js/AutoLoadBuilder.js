@@ -170,7 +170,9 @@ function builderAddPayloadStepFromSelect() {
   if (!sel.value) return;
   const filename = sel.value;
   const autoPort = parseInt(sel.options[sel.selectedIndex].dataset.autoPort, 10);
-  builder.steps.push({ type: 'payload', filename, autoPort, portOverride: null });
+  const p = state.payloads.find(x => x.name === filename);
+  const version = (p && p.source) ? p.source.version : null;
+  builder.steps.push({ type: 'payload', filename, autoPort, portOverride: null, version });
   sel.value = '';                                    // reset selector
   document.getElementById('panel-payload').style.display = 'none';
   builderRenderList(); scheduleSave();
@@ -183,7 +185,9 @@ function builderAddPayloadStep() {
   const autoPort    = parseInt(sel.options[sel.selectedIndex].dataset.autoPort, 10);
   const portVal     = parseInt(document.getElementById('panel-payload-port').value, 10);
   const portOverride = (portVal > 0 && portVal <= 65535) ? portVal : null;
-  builder.steps.push({ type: 'payload', filename, autoPort, portOverride });
+  const p = state.payloads.find(x => x.name === filename);
+  const version = (p && p.source) ? p.source.version : null;
+  builder.steps.push({ type: 'payload', filename, autoPort, portOverride, version });
   document.getElementById('panel-payload-port').value  = '';
   sel.value = '';
   document.getElementById('panel-payload').style.display = 'none';
@@ -278,6 +282,61 @@ function _builderMakeOrderBtns(idx) {
   return btns;
 }
 
+// ── Inline payload edit panel (payload-replace only) ─────────────
+function _buildPayloadEditPanel(step, idx) {
+  const panel = document.createElement('div');
+  panel.className    = 'step-edit-panel';
+  panel.style.display = 'none';
+
+  const sel = document.createElement('select');
+  sel.className = 'step-edit-select';
+
+  function populate() {
+    sel.innerHTML = '<option value="">– Replace payload –</option>';
+    const favs = state.payloads.filter(p =>  state.payloadFavorites.includes(p.name));
+    const rest = state.payloads.filter(p => !state.payloadFavorites.includes(p.name));
+    function addGroup(label, items) {
+      if (!items.length) return;
+      const grp = document.createElement('optgroup');
+      grp.label = label;
+      items.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value            = p.name;
+        opt.textContent      = (state.payloadFavorites.includes(p.name) ? '⭐ ' : '') + p.name;
+        opt.dataset.autoPort = String(p.auto_port);
+        if (p.name === step.filename) opt.selected = true;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+    addGroup('— Favorites —', favs);
+    addGroup(favs.length ? '— All Payloads —' : '— Payloads —', rest);
+  }
+
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    const opt = sel.options[sel.selectedIndex];
+    const newP = state.payloads.find(x => x.name === sel.value);
+    builder.steps[idx].filename     = sel.value;
+    builder.steps[idx].autoPort     = parseInt(opt.dataset.autoPort, 10);
+    builder.steps[idx].portOverride = null;
+    builder.steps[idx].version      = (newP && newP.source) ? newP.source.version : null;
+    panel.style.display = 'none';
+    builderRenderList(); scheduleSave();
+  });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className   = 'btn btn-sm';
+  cancelBtn.textContent = '✕';
+  cancelBtn.title       = 'Cancel';
+  cancelBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+
+  panel.appendChild(sel);
+  panel.appendChild(cancelBtn);
+  panel.open = () => { populate(); panel.style.display = panel.style.display === 'none' ? '' : 'none'; };
+  return panel;
+}
+
 // ── WorkflowStep renderers ────────────────────────────────────────
 function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   const isLua = step.filename.toLowerCase().endsWith('.lua');
@@ -289,14 +348,18 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   fnEl.className   = 'step-filename';
   fnEl.textContent = step.filename;
   fnEl.title       = step.filename;
-  fnEl.addEventListener('click', e => {
-    e.stopPropagation();
-    fnEl.classList.toggle('expanded');
-  });
+  fnEl.addEventListener('click', e => { e.stopPropagation(); fnEl.classList.toggle('expanded'); });
 
   const portHint = document.createElement('span');
   portHint.className   = 'step-autoport advanced-only';
   portHint.textContent = `:${step.portOverride || step.autoPort}`;
+
+  const editPanel = _buildPayloadEditPanel(step, idx);
+  const editBtn   = document.createElement('button');
+  editBtn.className   = 'btn btn-sm btn-edit-payload';
+  editBtn.textContent = '✏';
+  editBtn.title       = 'Replace payload';
+  editBtn.addEventListener('click', e => { e.stopPropagation(); editPanel.open(); });
 
   mainRow.appendChild(_builderMakeDragHandle(stepEl));
   mainRow.appendChild(_makeStepNum(idx));
@@ -304,7 +367,74 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   mainRow.appendChild(fnEl);
   mainRow.appendChild(portHint);
   mainRow.appendChild(_makeStepStatusBadge(idx));
+  mainRow.appendChild(editBtn);
   mainRow.appendChild(btns);
+
+  // Source / version row — always rendered below main row
+  const p = state.payloads.find(x => x.name === step.filename);
+  stepEl.appendChild(mainRow);
+  {
+    const srcRow = document.createElement('div');
+    srcRow.className = 'step-src-row';
+
+    if (p && p.source) {
+      if (!step.version) step.version = p.source.version;
+
+      const repoEl = document.createElement('span');
+      repoEl.className   = 'step-src-repo';
+      repoEl.textContent = p.source.repo;
+      srcRow.appendChild(repoEl);
+
+      const verLabel = document.createElement('span');
+      verLabel.className   = 'step-ver-label';
+      verLabel.textContent = 'Version:';
+      srcRow.appendChild(verLabel);
+
+      const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
+      const curVer   = step.version || p.source.version;
+
+      if (versions.length >= 1) {
+        // Interactive — updates step only, does NOT touch the global file/list
+        const verSel = document.createElement('select');
+        verSel.className = 'step-ver-inline';
+        versions.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value               = v.tag;
+          opt.textContent         = v.tag === p.source.latest_version ? `${v.tag} (latest)` : v.tag;
+          opt.dataset.downloadUrl = v.download_url;
+          if (v.tag === curVer) opt.selected = true;
+          verSel.appendChild(opt);
+        });
+        verSel.addEventListener('change', () => {
+          builder.steps[idx].version = verSel.value;
+          scheduleSave();
+          showToast(`Step ${idx + 1} → ${verSel.value}`);
+        });
+        srcRow.appendChild(verSel);
+      } else {
+        // No version history — disabled dropdown
+        const verSel = document.createElement('select');
+        verSel.className = 'step-ver-inline';
+        verSel.disabled  = true;
+        const opt = document.createElement('option');
+        opt.textContent = curVer || 'No versions available';
+        if (curVer) opt.value = curVer;
+        opt.selected = true;
+        verSel.appendChild(opt);
+        srcRow.appendChild(verSel);
+      }
+    } else {
+      // Local payload — no source control
+      const localEl = document.createElement('span');
+      localEl.className   = 'step-local-file';
+      localEl.textContent = 'Local file · No version control';
+      srcRow.appendChild(localEl);
+    }
+
+    stepEl.appendChild(srcRow);
+  }
+
+  stepEl.appendChild(editPanel);
 
   // Port details row (advanced only)
   const details   = document.createElement('div');
@@ -325,7 +455,6 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   });
   portField.appendChild(portLabel); portField.appendChild(portInp);
   details.appendChild(portField);
-  stepEl.appendChild(mainRow);
   stepEl.appendChild(details);
 }
 
@@ -470,14 +599,48 @@ async function stopAutoload() {
   } catch (e) { log('Stop: ' + e.message, 'error'); }
 }
 
+async function _ensureBuilderVersions() {
+  // For each payload step that has a specific version, switch the file to that version
+  // before the run starts so the correct binary is sent.
+  const seen = {}; // filename → version already set this run
+  for (const step of builder.steps) {
+    if (step.type !== 'payload' || !step.version) continue;
+    if (seen[step.filename] === step.version) continue; // already set
+    const p = state.payloads.find(x => x.name === step.filename);
+    if (!p || !p.source || p.source.version === step.version) {
+      seen[step.filename] = step.version;
+      continue;
+    }
+    const vers    = Array.isArray(p.source.versions) ? p.source.versions : [];
+    const target  = vers.find(v => v.tag === step.version);
+    if (!target) { log(`Version ${step.version} not found for '${step.filename}', using current`, 'warn'); continue; }
+    try {
+      log(`Switching '${step.filename}' → ${step.version} …`, 'info');
+      await api(`/api/payloads/${encodeURIComponent(step.filename)}/switch-version`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo: p.source.repo, asset_name: p.source.asset,
+          download_url: target.download_url, version: step.version,
+        }),
+      });
+      p.source.version = step.version;
+      seen[step.filename] = step.version;
+    } catch (e) { log(`Pre-switch '${step.filename}': ${e.message}`, 'error'); }
+  }
+}
+
 async function builderRunDirect() {
   if (!builder.steps.length) { alert('No steps to run!'); return; }
   const host = getHost(); if (!host) return;
-  const tmpProfile = '_builder_run.txt';
-  const content    = `# Auto-Load Builder direct run\n${builderGenerate()}\n`;
   clearStepRunStatus();
   _setBuilderRunning(true);
   try {
+    // Ensure each step's payload is at the correct version before sending
+    await _ensureBuilderVersions();
+
+    const tmpProfile = '_builder_run.txt';
+    const content    = `# Auto-Load Builder direct run\n${builderGenerate()}\n`;
     await api('/api/autoload/content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -486,10 +649,7 @@ async function builderRunDirect() {
     await api('/api/autoload/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        host, profile: tmpProfile,
-        continue_on_error: false,
-      }),
+      body: JSON.stringify({ host, profile: tmpProfile, continue_on_error: false }),
     });
   } catch (e) { log('Run: ' + e.message, 'error'); }
   finally {

@@ -32,3 +32,23 @@ class PortCheckRequest(BaseModel):
 
 class DeviceList(BaseModel):
     devices: List[Dict[str, Any]]
+
+
+class SourceAddRequest(BaseModel):
+    repo: str
+    filter: str = ""
+
+
+class ImportPayloadRequest(BaseModel):
+    repo: str
+    asset_name: str
+    download_url: str
+    version: str
+    all_versions: List[Dict[str, str]] = []   # [{tag, download_url}, ...]
+
+
+class SwitchVersionRequest(BaseModel):
+    repo: str
+    asset_name: str
+    download_url: str
+    version: str

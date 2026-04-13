@@ -139,6 +139,174 @@ function buildPayloadItem(p) {
 
   el.appendChild(rowTop);
   el.appendChild(rowBot);
+
+  // ── Row 3: source info + version (always rendered) ──────────────
+  {
+    const rowSrc = document.createElement('div');
+    rowSrc.className = 'p-row-source';
+
+    if (p.source) {
+      // GitHub-sourced payload
+      const srcBadge = document.createElement('span');
+      srcBadge.className   = 'source-badge';
+      srcBadge.textContent = '⎔ ' + p.source.repo;
+      srcBadge.title       = p.source.repo;
+      rowSrc.appendChild(srcBadge);
+
+      const verLabel = document.createElement('span');
+      verLabel.className   = 'p-ver-label';
+      verLabel.textContent = 'Version:';
+      rowSrc.appendChild(verLabel);
+
+      const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
+      if (versions.length > 0) {
+        const verSel = document.createElement('select');
+        verSel.className = 'p-ver-select';
+        versions.forEach((v, i) => {
+          const opt = document.createElement('option');
+          opt.value               = v.tag;
+          opt.textContent         = v.tag === p.source.latest_version ? `${v.tag} (latest)` : v.tag;
+          opt.dataset.downloadUrl = v.download_url;
+          if (v.tag === p.source.version) opt.selected = true;
+          verSel.appendChild(opt);
+        });
+        verSel.addEventListener('change', async () => {
+          const newVer = verSel.value;
+          if (newVer === p.source.version) return;
+          const opt = verSel.options[verSel.selectedIndex];
+          // Lazy usage check
+          let usedIn = [];
+          try {
+            const usage = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`);
+            usedIn = usage.used_in || [];
+          } catch (_) {}
+          if (builder.steps.some(s => s.type === 'payload' && s.filename === p.name)) usedIn.push('Builder');
+          if (usedIn.length && !confirm(`'${p.name}' is used in: ${usedIn.join(', ')}.\nSwitch to ${newVer}?`)) {
+            verSel.value = p.source.version; return;
+          }
+          verSel.disabled = true;
+          try {
+            await api(`/api/payloads/${encodeURIComponent(p.name)}/switch-version`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                repo: p.source.repo, asset_name: p.source.asset,
+                download_url: opt.dataset.downloadUrl, version: newVer,
+              }),
+            });
+            p.source.version = newVer;
+            if (state.updateResults) delete state.updateResults[p.name];
+            showToast(`Switched to ${newVer}`);
+            await refreshPayloads();
+          } catch (e) {
+            log('Switch version: ' + e.message, 'error');
+            verSel.value = p.source.version;
+            verSel.disabled = false;
+          }
+        });
+        rowSrc.appendChild(verSel);
+      } else {
+        // No version history — show disabled dropdown with appropriate message
+        const verSel = document.createElement('select');
+        verSel.className = 'p-ver-select';
+        verSel.disabled  = true;
+        const opt = document.createElement('option');
+        opt.textContent = p.source.version || 'No versions available';
+        if (p.source.version) opt.value = p.source.version;
+        opt.selected = true;
+        verSel.appendChild(opt);
+        rowSrc.appendChild(verSel);
+      }
+    } else {
+      // Local payload — no source control
+      const localBadge = document.createElement('span');
+      localBadge.className   = 'p-local-file';
+      localBadge.textContent = 'Local file · No version control';
+      rowSrc.appendChild(localBadge);
+    }
+
+    // ── Update / up-to-date indicator (sourced payloads only) ────────
+    const updateInfo = p.source ? (state.updateResults || {})[p.name] : null;
+    if (p.source && updateInfo) {
+      // New version available
+      const warnEl = document.createElement('span');
+      warnEl.className   = 'payload-update-warn';
+      warnEl.textContent = `⚠ ${updateInfo.latest_version}`;
+      warnEl.title       = 'New version available on GitHub';
+      const updBtn = document.createElement('button');
+      updBtn.className   = 'btn btn-sm source-update-btn';
+      updBtn.textContent = 'Update';
+      updBtn.addEventListener('click', async ev => {
+        ev.stopPropagation();
+        // Workflow check before updating
+        let usedIn = [];
+        try { const u = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`); usedIn = u.used_in || []; } catch (_) {}
+        if (builder.steps.some(s => s.type === 'payload' && s.filename === p.name)) usedIn.push('Builder');
+        if (usedIn.length && !confirm(`'${p.name}' is used in: ${usedIn.join(', ')}.\nUpdate to ${updateInfo.latest_version}?`)) return;
+        updBtn.disabled = true; updBtn.textContent = 'Updating…';
+        try {
+          await api(`/api/payloads/${encodeURIComponent(p.name)}/switch-version`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              repo: updateInfo.repo, asset_name: updateInfo.asset_name,
+              download_url: updateInfo.download_url, version: updateInfo.latest_version,
+            }),
+          });
+          delete state.updateResults[p.name];
+          showToast(`Updated to ${updateInfo.latest_version}`);
+          await refreshPayloads();
+          if (typeof checkAllUpdates === 'function') checkAllUpdates();
+        } catch (e) {
+          log('Update: ' + e.message, 'error');
+          updBtn.disabled = false; updBtn.textContent = 'Update';
+        }
+      });
+      rowSrc.appendChild(warnEl);
+      rowSrc.appendChild(updBtn);
+    } else if (p.source && state.updateCheckDone) {
+      // Check has run and this payload is current
+      const upToDate = document.createElement('span');
+      upToDate.className   = 'payload-uptodate';
+      upToDate.textContent = '✔ Up to date';
+      rowSrc.appendChild(upToDate);
+    }
+
+    // ── Builder usage warning ────────────────────────────────────────
+    const builderUses = builder.steps.filter(s => s.type === 'payload' && s.filename === p.name).length;
+    if (builderUses) {
+      const usedWarn = document.createElement('span');
+      usedWarn.className   = 'payload-used-warn';
+      usedWarn.textContent = `⚠ In builder`;
+      usedWarn.title       = `Used in ${builderUses} builder step${builderUses > 1 ? 's' : ''}`;
+      rowSrc.appendChild(usedWarn);
+    }
+
+    // Rollback button if backup exists (sourced payloads only)
+    if (p.source && p.source.backup_version) {
+      const rbBtn = document.createElement('button');
+      rbBtn.className   = 'btn btn-sm';
+      rbBtn.textContent = `↩ ${p.source.backup_version}`;
+      rbBtn.title       = 'Rollback to previous version';
+      rbBtn.style.marginLeft = 'auto';
+      rbBtn.addEventListener('click', async ev => {
+        ev.stopPropagation();
+        if (!confirm(`Roll back '${p.name}' to ${p.source.backup_version}?`)) return;
+        rbBtn.disabled = true; rbBtn.textContent = 'Rolling back…';
+        try {
+          await api(`/api/payloads/${encodeURIComponent(p.name)}/rollback`, { method: 'POST' });
+          showToast(`Rolled back to ${p.source.backup_version}`);
+          await refreshPayloads();
+        } catch (e) {
+          log('Rollback: ' + e.message, 'error');
+          rbBtn.disabled = false; rbBtn.textContent = `↩ ${p.source.backup_version}`;
+        }
+      });
+      rowSrc.appendChild(rbBtn);
+    }
+
+    el.appendChild(rowSrc);
+  }
+
   return el;
 }
 

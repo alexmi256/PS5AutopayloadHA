@@ -20,7 +20,9 @@ from config import (
     OLD_PAYLOAD_DIR,
     OLD_STATE_FILE,
     PAYLOAD_DIR,
+    PAYLOAD_META_FILE,
     PROFILES_DIR,
+    SOURCES_FILE,
     STATE_FILE,
 )
 from ha_component import write_custom_component
@@ -104,18 +106,61 @@ def save_ui_state(data: dict) -> None:
 
 # ── Directory listings ────────────────────────────────────────────
 
+# ── Sources ───────────────────────────────────────────────────────
+
+def load_sources() -> List[Dict[str, Any]]:
+    try:
+        if SOURCES_FILE.exists():
+            return json.loads(SOURCES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+
+def save_sources(sources: List[Dict[str, Any]]) -> None:
+    SOURCES_FILE.write_text(
+        json.dumps(sources, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+# ── Payload metadata ──────────────────────────────────────────────
+
+def load_payload_meta() -> Dict[str, Any]:
+    try:
+        if PAYLOAD_META_FILE.exists():
+            return json.loads(PAYLOAD_META_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def save_payload_meta(meta: Dict[str, Any]) -> None:
+    PAYLOAD_META_FILE.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+# ── Directory listings ────────────────────────────────────────────
+
 def list_payloads() -> List[dict]:
+    meta = load_payload_meta()
     result = []
     for f in sorted(PAYLOAD_DIR.iterdir()):
         if f.is_file() and f.suffix.lower() in ALLOWED_PAYLOAD_EXTENSIONS:
             st = f.stat()
-            result.append({
+            entry: Dict[str, Any] = {
                 "name": f.name,
                 "size": st.st_size,
                 "ext": f.suffix.lower(),
                 "auto_port": resolve_port(f.name),
                 "mtime": int(st.st_mtime),
-            })
+            }
+            if f.name in meta:
+                src = dict(meta[f.name])
+                versions = src.get("versions") or []
+                src["latest_version"] = versions[0]["tag"] if versions else src.get("version", "")
+                entry["source"] = src
+            result.append(entry)
     return result
 
 

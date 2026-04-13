@@ -315,6 +315,24 @@ body {
 .step-autoport { font-size:.72rem; color:var(--dim); flex-shrink:0 }
 .step-btns { display:flex; gap:.2rem; flex-shrink:0 }
 
+/* ---- Inline payload edit ---- */
+.btn-edit-payload { color:var(--dim); padding:.15rem .3rem; font-size:.8rem; flex-shrink:0 }
+.btn-edit-payload:hover { color:var(--primary) }
+
+.step-edit-panel {
+  display:flex; align-items:center; gap:.4rem;
+  padding:.35rem .5rem; margin-top:.05rem;
+  background:var(--bg); border:1px solid var(--primary);
+  border-radius:var(--r-sm);
+}
+.step-edit-select {
+  flex:1; min-width:0;
+  padding:.25rem .38rem; font-size:.85rem;
+  background:var(--input-bg); border:1px solid var(--border);
+  border-radius:.25rem; color:var(--text);
+}
+.step-edit-select:focus { outline:none; border-color:var(--focus) }
+
 .step-details { display:flex; flex-wrap:wrap; gap:.38rem .6rem; padding-left:1.45rem }
 .step-field { display:flex; align-items:center; gap:.28rem }
 .step-field-label { font-size:.72rem; color:var(--muted); flex-shrink:0; white-space:nowrap }
@@ -554,6 +572,122 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .qs-tile:disabled { opacity: .45; cursor: not-allowed }
 
 /* Profile run-button stop state is handled by .btn-danger already */
+
+/* ---- Payload Sources ---- */
+.section-hint { font-size:.77rem; color:var(--dim); margin-bottom:.65rem; margin-top:-.2rem }
+.field-hint   { font-size:.72rem; color:var(--dim); font-weight:400; margin-left:.3rem }
+
+.source-item {
+  display:flex; flex-direction:column; gap:0;
+  padding:.42rem .55rem; background:var(--input-bg);
+  border:1px solid var(--border); border-radius:var(--r-sm);
+  margin-bottom:.3rem;
+}
+.source-main-row { display:flex; align-items:center; gap:.5rem }
+.source-info  { display:flex; flex-direction:column; flex:1; min-width:0; gap:.08rem }
+.source-repo  { font-size:.87rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.source-filter{ font-size:.72rem; color:var(--dim) }
+.source-btns  { display:flex; gap:.25rem; flex-shrink:0 }
+
+/* Per-source check results panel */
+.source-check-panel {
+  margin-top:.45rem; padding-top:.4rem;
+  border-top:1px solid var(--border);
+}
+.source-check-status {
+  font-size:.8rem; font-weight:600; margin-bottom:.35rem;
+}
+.source-check-status.ok   { color:var(--green) }
+.source-check-status.warn { color:var(--log-warn) }
+.source-check-hdr { font-size:.78rem; color:var(--dim); margin-bottom:.25rem }
+.source-check-list { margin-bottom:.3rem }
+
+.source-status { font-size:.8rem; min-height:1.1em }
+.source-status.loading { color:var(--muted) }
+.source-status.ok      { color:var(--green) }
+.source-status.error   { color:var(--danger) }
+
+.detected-row {
+  display:flex; align-items:center; gap:.45rem;
+  padding:.32rem .4rem; margin-bottom:.22rem;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:.25rem;
+}
+.detected-name { flex:1; font-size:.86rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0 }
+.detected-ver  { font-size:.75rem; color:var(--muted); flex-shrink:0; font-family:monospace }
+
+/* Source row in payload list */
+.p-row-source {
+  display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;
+  padding-top:.2rem; margin-top:.05rem;
+  border-top:1px solid var(--border);
+}
+.source-badge {
+  font-size:.72rem; color:var(--dim);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  max-width:200px; flex-shrink:1;
+}
+.source-ver { font-size:.72rem; color:var(--muted); font-family:monospace; flex-shrink:0 }
+.source-update-btn {
+  margin-left:auto; font-size:.72rem; font-weight:700;
+  color:var(--green); border-color:var(--green);
+  padding:.1rem .45rem;
+}
+.source-update-btn:hover { background:var(--green); color:#fff }
+
+/* Inline source/version row inside builder payload steps */
+.step-src-row {
+  display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
+  padding:.18rem .5rem .18rem 1.55rem; margin-top:.05rem;
+  border-top:1px solid var(--border); font-size:.72rem;
+}
+.step-src-repo  { color:var(--dim); flex-shrink:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+.step-ver-label { color:var(--dim); flex-shrink:0 }
+.step-ver-inline {
+  font-size:.72rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
+  border:1px solid var(--border); border-radius:.2rem;
+  background:var(--input-bg); color:var(--fg); max-width:130px;
+}
+.step-local-file { color:var(--dim); font-style:italic; flex-shrink:0 }
+
+/* Version label + dropdown in payload list source row */
+.p-ver-label  { font-size:.72rem; color:var(--dim); flex-shrink:0 }
+.p-ver-select {
+  font-size:.72rem; padding:.08rem .3rem; height:auto;
+  border:1px solid var(--border); border-radius:.2rem;
+  background:var(--input-bg); color:var(--fg); max-width:140px; flex-shrink:0;
+}
+/* Local file badge (no source control) */
+.p-local-file { font-size:.72rem; color:var(--dim); font-style:italic; flex-shrink:0 }
+
+/* Update-available warning badge per payload */
+.payload-update-warn {
+  font-size:.72rem; color:var(--log-warn); font-weight:600; flex-shrink:0;
+}
+
+/* Up-to-date indicator per payload (shown after check runs) */
+.payload-uptodate {
+  font-size:.72rem; color:var(--green); flex-shrink:0;
+}
+
+/* Builder usage warning per payload */
+.payload-used-warn {
+  font-size:.72rem; color:var(--muted); flex-shrink:0;
+  border:1px solid var(--border); border-radius:.2rem;
+  padding:.05rem .3rem;
+}
+
+/* Global update controls bar (below sources list) */
+.update-controls {
+  display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+  margin-top:.6rem; padding-top:.5rem;
+  border-top:1px solid var(--border);
+}
+.update-count-badge {
+  font-size:.78rem; font-weight:600; flex:1; min-width:0;
+}
+.update-count-badge.warn { color:var(--log-warn) }
+.update-count-badge.ok   { color:var(--green) }
 
 /* ---- Mobile scaling fixes ---- */
 @media (max-width: 480px) {

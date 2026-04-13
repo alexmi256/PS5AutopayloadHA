@@ -14,11 +14,13 @@ SUPERVISOR_TOKEN: str = os.environ.get("SUPERVISOR_TOKEN", "")
 APP_DIR    = Path("/app")
 STATIC_DIR = Path(__file__).parent / "static"
 
-CONFIG_BASE  = Path("/config/ps5_autopayload")
-PAYLOAD_DIR  = CONFIG_BASE / "payloads"
-PROFILES_DIR = CONFIG_BASE / "profiles"
-STATE_FILE   = CONFIG_BASE / "config.json"
-DEVICES_FILE = CONFIG_BASE / "devices.json"
+CONFIG_BASE       = Path("/config/ps5_autopayload")
+PAYLOAD_DIR       = CONFIG_BASE / "payloads"
+PROFILES_DIR      = CONFIG_BASE / "profiles"
+STATE_FILE        = CONFIG_BASE / "config.json"
+DEVICES_FILE      = CONFIG_BASE / "devices.json"
+SOURCES_FILE      = CONFIG_BASE / "sources.json"
+PAYLOAD_META_FILE = CONFIG_BASE / "payload_meta.json"
 
 # Legacy paths – used once for migration from /data/
 OLD_PAYLOAD_DIR  = Path("/data/payloads")
