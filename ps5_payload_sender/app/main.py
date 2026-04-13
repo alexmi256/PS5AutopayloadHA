@@ -88,6 +88,7 @@ from models import (
     SaveProfileRequest,
     SendRequest,
     SourceAddRequest,
+    SourceUpdateRequest,
     SwitchVersionRequest,
 )
 import flow_analysis
@@ -416,12 +417,6 @@ async def api_delete_source(owner: str, repo_name: str):
     slug = f"{owner}/{repo_name}"
     save_sources([s for s in load_sources() if s["repo"] != slug])
     return {"success": True}
-
-
-class SourceUpdateRequest(BaseModel):
-    filter: str = ""
-    source_type: str = "auto"
-    folder: str = ""
 
 
 @app.put("/api/sources/{owner}/{repo_name}")

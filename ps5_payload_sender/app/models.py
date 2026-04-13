@@ -81,3 +81,9 @@ class FlowAnalyzeRequest(BaseModel):
     host: str
     steps: List[FlowStepModel]
     safe_mode: bool = True
+
+
+class SourceUpdateRequest(BaseModel):
+    filter: str = ""
+    source_type: str = "auto"
+    folder: str = ""
