@@ -28,7 +28,7 @@ OLD_STATE_FILE   = Path("/data/state.json")
 OLD_DEVICES_FILE = Path("/data/devices.json")
 
 # ── Misc ──────────────────────────────────────────────────────────
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.0-dev"
 GITHUB_RAW_CONFIG = (
     "https://raw.githubusercontent.com/cosmicflow2512/PS5AutopayloadHA"
     "/main/ps5_payload_sender/config.yaml"
