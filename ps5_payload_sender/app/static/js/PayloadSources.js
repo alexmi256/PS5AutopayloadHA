@@ -1,6 +1,8 @@
 'use strict';
 
 // ── Payload Sources (GitHub) ─────────────────────────────────────
+// _editingSourceRepo tracks which source is being edited (null = add mode)
+let _editingSourceRepo = null;
 
 function _parseRepoInput(raw) {
   let s = raw.trim();
@@ -60,6 +62,12 @@ function renderSourcesList() {
     checkBtn.title = 'Check for new payloads and updates';
     checkBtn.addEventListener('click', () => checkSourceUpdates(src.repo, el));
 
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-sm';
+    editBtn.textContent = '✏';
+    editBtn.title = 'Edit source';
+    editBtn.addEventListener('click', () => editSource(src));
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-sm btn-danger';
     delBtn.textContent = '✕';
@@ -67,6 +75,7 @@ function renderSourcesList() {
     delBtn.addEventListener('click', () => deleteSource(src.repo));
 
     btns.appendChild(checkBtn);
+    btns.appendChild(editBtn);
     btns.appendChild(delBtn);
     mainRow.appendChild(info);
     mainRow.appendChild(btns);
@@ -82,16 +91,96 @@ function renderSourcesList() {
   });
 }
 
-// ── Add Source ───────────────────────────────────────────────────
+// ── Add / Edit Source panel ───────────────────────────────────────
 function toggleAddSourcePanel() {
   const panel = document.getElementById('source-add-panel');
-  panel.style.display = panel.style.display === 'none' ? '' : 'none';
-  if (panel.style.display !== 'none') {
-    document.getElementById('source-repo-input').focus();
-    document.getElementById('source-detected').style.display = 'none';
-    document.getElementById('source-add-status').textContent = '';
-    document.getElementById('source-add-status').className = 'source-status';
-    _onSourceTypeChange();  // sync folder wrap visibility
+  const isOpen = panel.style.display !== 'none';
+  if (isOpen) {
+    _closeSourcePanel();
+  } else {
+    _openSourcePanel();
+  }
+}
+
+function _openSourcePanel(prefill = null) {
+  _editingSourceRepo = prefill ? prefill.repo : null;
+
+  // Pre-fill (edit mode) or clear (add mode)
+  document.getElementById('source-repo-input').value  = prefill?.repo    || '';
+  document.getElementById('source-filter-input').value = prefill?.filter || '';
+
+  // Source type radio
+  const typeVal = prefill?.source_type || 'auto';
+  const radio = document.querySelector(`input[name="src-type"][value="${typeVal}"]`);
+  if (radio) radio.checked = true;
+  _onSourceTypeChange();
+
+  // Folder — pre-populate with saved value
+  if (prefill?.folder && typeVal === 'folder') {
+    const sel = document.getElementById('source-folder-select');
+    if (sel) {
+      sel.innerHTML = `<option value="${prefill.folder}" selected>${prefill.folder}</option>`;
+      document.getElementById('source-folder-hint').textContent = '';
+    }
+  }
+
+  // Update title and button labels for edit vs add
+  const titleEl  = document.getElementById('source-panel-title');
+  const fetchBtn = document.getElementById('btn-source-fetch');
+  const saveBtn  = document.getElementById('btn-source-save');
+  if (titleEl)  titleEl.textContent  = _editingSourceRepo ? 'Edit Source' : 'Add Source';
+  if (fetchBtn) fetchBtn.textContent = _editingSourceRepo ? '↻ Re-scan'   : 'Detect Payloads';
+  if (saveBtn)  saveBtn.style.display = _editingSourceRepo ? '' : 'none';
+
+  document.getElementById('source-detected').style.display = 'none';
+  document.getElementById('source-add-status').textContent = '';
+  document.getElementById('source-add-status').className = 'source-status';
+
+  const panel = document.getElementById('source-add-panel');
+  panel.style.display = '';
+  document.getElementById('source-repo-input').focus();
+}
+
+function _closeSourcePanel() {
+  _editingSourceRepo = null;
+  document.getElementById('source-add-panel').style.display = 'none';
+}
+
+function editSource(src) {
+  _openSourcePanel(src);
+}
+
+// ── Save source config without re-scanning ────────────────────────
+async function saveSourceConfig() {
+  const repo = _parseRepoInput(document.getElementById('source-repo-input').value);
+  const statusEl = document.getElementById('source-add-status');
+  if (!repo) {
+    statusEl.textContent = 'Enter a repository'; statusEl.className = 'source-status error'; return;
+  }
+  const [owner, repoName] = repo.split('/');
+  const sourceType = _getSourceType();
+  const folder = sourceType === 'folder'
+    ? (document.getElementById('source-folder-select')?.value || '') : '';
+  const filter = document.getElementById('source-filter-input').value.trim();
+
+  try {
+    // Delete old + add updated entry
+    if (_editingSourceRepo && _editingSourceRepo !== repo) {
+      const [oldOwner, oldRepoName] = _editingSourceRepo.split('/');
+      await api(`/api/sources/${encodeURIComponent(oldOwner)}/${encodeURIComponent(oldRepoName)}`,
+        { method: 'DELETE' });
+    }
+    await api(`/api/sources/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filter, source_type: sourceType, folder }),
+    });
+    statusEl.textContent = 'Source updated.'; statusEl.className = 'source-status ok';
+    _editingSourceRepo = null;
+    await refreshSources();
+    setTimeout(_closeSourcePanel, 800);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message; statusEl.className = 'source-status error';
   }
 }
 
@@ -173,6 +262,13 @@ async function addSource() {
   document.getElementById('source-detected').style.display = 'none';
 
   try {
+    // In edit mode: remove old entry first if the repo slug changed
+    if (_editingSourceRepo && _editingSourceRepo !== repo) {
+      const [oldOwner, oldRepo] = _editingSourceRepo.split('/');
+      await api(`/api/sources/${encodeURIComponent(oldOwner)}/${encodeURIComponent(oldRepo)}`,
+        { method: 'DELETE' });
+    }
+
     const data = await api('/api/sources', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -193,6 +289,7 @@ async function addSource() {
     _renderDetectedPayloads(data.repo, data.assets);
     if (linked.length) await refreshPayloads();
     await refreshSources();
+    _editingSourceRepo = null;
     repoInput.value   = '';
     filterInput.value = '';
   } catch (e) {

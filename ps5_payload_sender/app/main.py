@@ -418,6 +418,31 @@ async def api_delete_source(owner: str, repo_name: str):
     return {"success": True}
 
 
+class SourceUpdateRequest(BaseModel):
+    filter: str = ""
+    source_type: str = "auto"
+    folder: str = ""
+
+
+@app.put("/api/sources/{owner}/{repo_name}")
+async def api_update_source(owner: str, repo_name: str, req: SourceUpdateRequest):
+    """Update an existing source's config without re-scanning."""
+    slug = f"{owner}/{repo_name}"
+    sources = load_sources()
+    updated = False
+    for s in sources:
+        if s["repo"] == slug:
+            s["filter"] = req.filter.strip()
+            s["source_type"] = req.source_type
+            s["folder"] = req.folder.strip()
+            updated = True
+            break
+    if not updated:
+        raise HTTPException(404, f"Source '{slug}' not found")
+    save_sources(sources)
+    return {"success": True, "repo": slug}
+
+
 @app.get("/api/sources/releases")
 async def api_source_releases(repo: str, asset: str = ""):
     parts = repo.strip().split("/")

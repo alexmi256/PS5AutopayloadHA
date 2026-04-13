@@ -75,7 +75,6 @@ async function init() {
 
   // Payload Sources
   document.getElementById('btn-add-source').addEventListener('click', toggleAddSourcePanel);
-  document.getElementById('btn-source-panel-x').addEventListener('click', toggleAddSourcePanel);
   document.getElementById('btn-source-fetch').addEventListener('click', addSource);
   document.getElementById('btn-source-import').addEventListener('click', importSelected);
   document.getElementById('btn-check-all-updates').addEventListener('click', checkAllUpdates);
@@ -121,7 +120,6 @@ async function init() {
   updateBuilderSummary();
   await refreshProfiles();
   updateProfilesSummary();
-  await loadTimingStats();
   await loadFlowRuns();
   initCollapsible();
   initFlowSelector();

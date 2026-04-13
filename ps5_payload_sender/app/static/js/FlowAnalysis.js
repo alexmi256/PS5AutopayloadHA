@@ -8,10 +8,10 @@ async function startFlowAnalysis() {
   if (!builder.steps.length) { showToast('No steps in builder'); return; }
 
   const safeMode = document.getElementById('flow-safe-mode').checked;
-  const btn      = document.getElementById('btn-analyze-flow');
+  const btn      = document.getElementById('btn-global-analyze');
   const timelineEl = document.getElementById('flow-timeline');
 
-  btn.disabled = true; btn.textContent = '⏳ Analyzing…';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyzing…'; }
   timelineEl.innerHTML = '<div class="flow-tl-row"><span class="flow-tl-ts">[00:00]</span><span class="flow-tl-msg">Flow started…</span></div>';
 
   try {
@@ -21,13 +21,12 @@ async function startFlowAnalysis() {
       body:    JSON.stringify({ host, steps: builder.steps, safe_mode: safeMode }),
     });
     renderFlowTimeline(res.run);
-    await loadTimingStats();
     _refreshFlowSectionSummary();
   } catch (e) {
     showToast('Analysis failed: ' + e.message);
     log('Flow analysis: ' + e.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '▶ Analyze Flow';
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Analyze'; }
   }
 }
 

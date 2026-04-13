@@ -862,11 +862,12 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   .flow-timeline   { max-height: 160px }
 }
 
-/* ── Global flow selector + action bar (header row 3) ──────────── */
-.header-row-actions {
-  padding-top: .3rem;
-  border-top: 1px solid var(--border);
-  margin-top: .15rem;
+/* ── Flow control bar (inside Analysis section) ─────────────────── */
+.flow-control-bar {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: .45rem .6rem;
+  background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm); margin-bottom: .6rem;
 }
 .flow-selector-wrap {
   display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0;
@@ -881,6 +882,13 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 }
 .action-btns {
   display: flex; gap: .35rem; flex-shrink: 0;
+}
+
+/* ── Add/Edit source panel title ────────────────────────────────── */
+.add-panel-title {
+  font-size: .78rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: .5rem;
 }
 
 /* ── Green button variant ───────────────────────────────────────── */

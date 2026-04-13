@@ -35,20 +35,6 @@
           <button onclick="importConfig()" class="btn btn-xs" title="Import config backup">⬆ Import</button>
         </div>
       </div>
-      <!-- Row 3: global flow selector + action buttons -->
-      <div class="header-row header-row-actions">
-        <div class="flow-selector-wrap">
-          <label class="flow-sel-label" for="global-flow-select">Flow:</label>
-          <select id="global-flow-select" class="input select flow-select">
-            <option value="">– Select flow –</option>
-          </select>
-        </div>
-        <div class="action-btns">
-          <button id="btn-global-run"     class="btn btn-green btn-sm" onclick="globalRun()"     disabled title="Run selected flow">▶ Run</button>
-          <button id="btn-global-analyze" class="btn btn-primary btn-sm" onclick="globalAnalyze()" disabled title="Analyze selected flow">📊 Analyze</button>
-          <button id="btn-global-stop"    class="btn btn-danger btn-sm" onclick="globalStop()"    style="display:none" title="Stop execution">⏹ Stop</button>
-        </div>
-      </div>
     </div>
   </header>
 
@@ -108,8 +94,9 @@
         </div>
         <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
 
-        <!-- Add source panel -->
+        <!-- Add / Edit source panel -->
         <div id="source-add-panel" class="add-panel" style="display:none">
+          <p class="add-panel-title" id="source-panel-title">Add Source</p>
           <div class="field-group">
             <label class="field-label" for="source-repo-input">Repository <span class="field-hint">owner/repo</span></label>
             <input type="text" id="source-repo-input" class="input"
@@ -157,7 +144,8 @@
           </div>
           <div class="row-gap">
             <button id="btn-source-fetch" class="btn btn-primary btn-sm" style="flex:1">Detect Payloads</button>
-            <button id="btn-source-panel-x" class="btn btn-sm">✕</button>
+            <button id="btn-source-save"  class="btn btn-secondary btn-sm" onclick="saveSourceConfig()" style="display:none" title="Save config without re-scanning">💾 Save</button>
+            <button id="btn-source-panel-x" class="btn btn-sm" onclick="_closeSourcePanel()">✕</button>
           </div>
           <div id="source-add-status" class="source-status" style="margin-top:.4rem"></div>
 
@@ -347,36 +335,33 @@
       </div>
       <div class="collapse-body">
 
-        <!-- Flow Analyzer controls -->
+        <!-- Flow control bar -->
+        <div class="flow-control-bar">
+          <div class="flow-selector-wrap">
+            <label class="flow-sel-label" for="global-flow-select">Flow:</label>
+            <select id="global-flow-select" class="input select flow-select">
+              <option value="">– Select flow –</option>
+            </select>
+          </div>
+          <div class="action-btns">
+            <button id="btn-global-run"     class="btn btn-green btn-sm" onclick="globalRun()"     disabled title="Run selected flow">▶ Run</button>
+            <button id="btn-global-analyze" class="btn btn-primary btn-sm" onclick="globalAnalyze()" disabled title="Analyze selected flow">📊 Analyze</button>
+            <button id="btn-global-stop"    class="btn btn-danger btn-sm" onclick="globalStop()"    style="display:none" title="Stop execution">⏹ Stop</button>
+          </div>
+        </div>
+
+        <!-- Safe mode + clear -->
         <div class="flow-controls">
           <label class="checkbox-label">
             <input type="checkbox" id="flow-safe-mode" checked />
             Safe Mode — don't send real payloads
           </label>
-          <div class="row-gap" style="margin-top:.5rem">
-            <button id="btn-analyze-flow" class="btn btn-primary" style="flex:1"
-              onclick="startFlowAnalysis()">▶ Analyze Flow</button>
-            <button onclick="clearFlowRuns()" class="btn btn-sm" title="Clear history">✕ Clear</button>
-          </div>
+          <button onclick="clearFlowRuns()" class="btn btn-xs" style="margin-top:.35rem" title="Clear history">✕ Clear History</button>
         </div>
 
         <!-- Timeline output -->
         <div id="flow-timeline" class="flow-timeline">
-          <p class="section-hint">Run Analyze Flow to see step-by-step timing.</p>
-        </div>
-
-        <!-- Port timing stats -->
-        <div style="margin-top:.75rem">
-          <div class="card-header-row" style="margin-bottom:.4rem">
-            <span class="section-subheader">Port Timing Stats</span>
-            <button onclick="clearTimingStats()" class="btn btn-xs" title="Clear port timing data">✕ Clear</button>
-          </div>
-          <div id="timing-stats"><p class="section-hint">No timing data yet.</p></div>
-          <div class="row-gap" style="margin-top:.5rem">
-            <input type="number" id="timing-port-input" class="input" value="9026" min="1" max="65535"
-              style="width:90px" title="Port to analyze" />
-            <button id="btn-timing-analyze" onclick="analyzePort()" class="btn btn-sm" style="flex:1">▶ Analyze Port</button>
-          </div>
+          <p class="section-hint">Select a flow above and click Analyze to see step-by-step timing.</p>
         </div>
 
         <!-- Manual port check (compact) -->
