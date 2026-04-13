@@ -65,6 +65,54 @@
       <div id="favorites-list" class="qs-list"></div>
     </section>
 
+    <!-- PAYLOAD SOURCES -->
+    <section class="card">
+      <div class="card-header-row">
+        <h2 class="card-title">Payload Sources</h2>
+        <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
+      </div>
+      <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
+
+      <!-- Add source panel -->
+      <div id="source-add-panel" class="add-panel" style="display:none">
+        <div class="field-group">
+          <label class="field-label" for="source-repo-input">Repository <span class="field-hint">owner/repo</span></label>
+          <input type="text" id="source-repo-input" class="input"
+            placeholder="e.g. ps5-payload-dev/kstuff"
+            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="source-filter-input">Asset filter <span class="field-hint">optional, e.g. *.elf</span></label>
+          <input type="text" id="source-filter-input" class="input"
+            placeholder="*.elf  (leave empty for all)"
+            autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="row-gap">
+          <button id="btn-source-fetch" class="btn btn-primary btn-sm" style="flex:1">Detect Payloads</button>
+          <button id="btn-source-panel-x" class="btn btn-sm">✕</button>
+        </div>
+        <div id="source-add-status" class="source-status" style="margin-top:.4rem"></div>
+
+        <!-- Detected payloads -->
+        <div id="source-detected" style="display:none;margin-top:.6rem">
+          <p class="field-label" style="margin-bottom:.35rem">Detected payloads:</p>
+          <div id="source-detected-list"></div>
+          <button id="btn-source-import" class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%">Import Selected</button>
+        </div>
+      </div>
+
+      <div id="sources-list" style="margin-top:.5rem">
+        <div class="empty-state">No sources added yet.</div>
+      </div>
+
+      <!-- Global update controls -->
+      <div id="update-controls" class="update-controls">
+        <span id="update-count-badge" class="update-count-badge"></span>
+        <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
+        <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
+      </div>
+    </section>
+
     <!-- PAYLOADS -->
     <section class="card">
       <div class="card-header-row">
@@ -269,6 +317,7 @@
   <script src="static/js/FavoritesBar.js"></script>
   <script src="static/js/AutoLoadBuilder.js"></script>
   <script src="static/js/ProfileManager.js"></script>
+  <script src="static/js/PayloadSources.js"></script>
   <script src="static/js/init.js"></script>
 </body>
 </html>

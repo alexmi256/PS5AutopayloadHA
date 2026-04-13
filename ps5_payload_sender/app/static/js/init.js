@@ -73,6 +73,17 @@ async function init() {
   });
   document.getElementById('builder-profile-name').addEventListener('input', scheduleSave);
 
+  // Payload Sources
+  document.getElementById('btn-add-source').addEventListener('click', toggleAddSourcePanel);
+  document.getElementById('btn-source-panel-x').addEventListener('click', toggleAddSourcePanel);
+  document.getElementById('btn-source-fetch').addEventListener('click', addSource);
+  document.getElementById('btn-source-import').addEventListener('click', importSelected);
+  document.getElementById('btn-check-all-updates').addEventListener('click', checkAllUpdates);
+  document.getElementById('btn-update-all').addEventListener('click', updateAll);
+  document.getElementById('source-repo-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSource();
+  });
+
   // Profiles
   document.getElementById('btn-refresh-profiles').addEventListener('click', refreshProfiles);
 
@@ -96,6 +107,7 @@ async function init() {
   // Boot sequence
   await loadDevicesFromServer();
   await loadPersistedState();
+  await refreshSources();
   try {
     const cfg = await api('/api/config');
     const ip  = document.getElementById('ps5-ip');
@@ -106,6 +118,8 @@ async function init() {
   await refreshPayloads();
   await refreshProfiles();
   connectWS();
+  // Non-blocking update check on startup (doesn't delay page load)
+  if (state.sources.length) checkAllUpdates();
 }
 
 document.addEventListener('DOMContentLoaded', init);

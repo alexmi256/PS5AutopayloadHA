@@ -18,6 +18,9 @@ const state = {
   advancedMode:     false,     // show/hide port inputs
   execState:        'idle',    // idle | running | paused | stopped | completed | failed
   runningProfile:   '',        // filename of currently running profile
+  sources:          [],        // GitHub payload sources
+  updateResults:    {},        // filename → {latest_version, download_url, ...}
+  updateCheckDone:  false,     // true after first update check completes
 };
 
 // Builder lives here so every module can access it

@@ -1,0 +1,470 @@
+'use strict';
+
+// ── Payload Sources (GitHub) ─────────────────────────────────────
+
+function _parseRepoInput(raw) {
+  let s = raw.trim();
+  s = s.replace(/^https?:\/\//i, '');
+  s = s.replace(/^github\.com\//i, '');
+  s = s.replace(/\.git$/i, '');
+  s = s.replace(/\/+$/, '');
+  const parts = s.split('/').filter(Boolean);
+  return parts.slice(0, 2).join('/');
+}
+
+async function refreshSources() {
+  try {
+    const data = await api('/api/sources');
+    state.sources = data.sources || [];
+    renderSourcesList();
+  } catch (e) { log('Load sources: ' + e.message, 'error'); }
+}
+
+function renderSourcesList() {
+  const container = document.getElementById('sources-list');
+  if (!container) return;
+  if (!state.sources.length) {
+    container.innerHTML = '<div class="empty-state">No sources added yet.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  state.sources.forEach(src => {
+    const el = document.createElement('div');
+    el.className = 'source-item fade';
+    el.dataset.repo = src.repo;
+
+    // ── Main row: info + buttons ─────────────────────────────────
+    const mainRow = document.createElement('div');
+    mainRow.className = 'source-main-row';
+
+    const info = document.createElement('div');
+    info.className = 'source-info';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'source-repo';
+    nameEl.textContent = src.repo;
+    info.appendChild(nameEl);
+    if (src.filter) {
+      const filterEl = document.createElement('span');
+      filterEl.className = 'source-filter';
+      filterEl.textContent = `filter: ${src.filter}`;
+      info.appendChild(filterEl);
+    }
+
+    const btns = document.createElement('div');
+    btns.className = 'source-btns';
+
+    const checkBtn = document.createElement('button');
+    checkBtn.className = 'btn btn-sm source-check-btn';
+    checkBtn.textContent = '↻ Check';
+    checkBtn.title = 'Check for new releases and updates';
+    checkBtn.addEventListener('click', () => checkSourceUpdates(src.repo, el));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm btn-danger';
+    delBtn.textContent = '✕';
+    delBtn.title = 'Remove source';
+    delBtn.addEventListener('click', () => deleteSource(src.repo));
+
+    btns.appendChild(checkBtn);
+    btns.appendChild(delBtn);
+    mainRow.appendChild(info);
+    mainRow.appendChild(btns);
+
+    // ── Check results panel (hidden until Check clicked) ─────────
+    const panel = document.createElement('div');
+    panel.className = 'source-check-panel';
+    panel.style.display = 'none';
+
+    el.appendChild(mainRow);
+    el.appendChild(panel);
+    container.appendChild(el);
+  });
+}
+
+// ── Add Source ───────────────────────────────────────────────────
+function toggleAddSourcePanel() {
+  const panel = document.getElementById('source-add-panel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  if (panel.style.display !== 'none') {
+    document.getElementById('source-repo-input').focus();
+    document.getElementById('source-detected').style.display = 'none';
+    document.getElementById('source-add-status').textContent = '';
+    document.getElementById('source-add-status').className = 'source-status';
+  }
+}
+
+async function addSource() {
+  const repoInput   = document.getElementById('source-repo-input');
+  const filterInput = document.getElementById('source-filter-input');
+  const statusEl    = document.getElementById('source-add-status');
+  const repo = _parseRepoInput(repoInput.value);
+  repoInput.value = repo; // show normalized value
+  if (!repo) { statusEl.textContent = 'Enter a repository (e.g. ps5-payload-dev/kstuff)'; statusEl.className = 'source-status error'; return; }
+
+  statusEl.textContent = 'Fetching releases from GitHub…';
+  statusEl.className   = 'source-status loading';
+  document.getElementById('source-detected').style.display = 'none';
+
+  try {
+    const data = await api('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo, filter: filterInput.value.trim() }),
+    });
+    const linked = data.auto_linked || [];
+    const msg = linked.length
+      ? `Found ${data.assets.length} payload(s) — auto-linked: ${linked.join(', ')}`
+      : `Found ${data.assets.length} payload(s)`;
+    statusEl.textContent = msg;
+    statusEl.className   = 'source-status ok';
+    _renderDetectedPayloads(data.repo, data.assets);
+    if (linked.length) await refreshPayloads();
+    await refreshSources();
+    repoInput.value   = '';
+    filterInput.value = '';
+  } catch (e) {
+    const txt = e.message.includes('404') ? 'Repository not found or no releases detected.' :
+                e.message.includes('400') ? 'Invalid format — use owner/repo (e.g. ps5-payload-dev/kstuff)' :
+                'Error: ' + e.message;
+    statusEl.textContent = txt;
+    statusEl.className   = 'source-status error';
+  }
+}
+
+function _renderDetectedPayloads(repo, assets) {
+  // Group by asset_name, keep all versions
+  const byAsset = {};
+  assets.forEach(a => {
+    if (!byAsset[a.asset_name]) byAsset[a.asset_name] = [];
+    byAsset[a.asset_name].push(a);
+  });
+
+  const container = document.getElementById('source-detected-list');
+  container.innerHTML = '';
+
+  Object.entries(byAsset).forEach(([assetName, versions]) => {
+    const latest = versions[0];
+    const extStr = assetName.includes('.') ? assetName.slice(assetName.lastIndexOf('.')).toLowerCase() : '';
+
+    const row = document.createElement('div');
+    row.className = 'detected-row';
+    row.dataset.repo        = repo;
+    row.dataset.assetName   = assetName;
+    row.dataset.downloadUrl = latest.download_url;
+    row.dataset.version     = latest.tag;
+    row.dataset.allVersions = JSON.stringify(
+      versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
+    );
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = true;
+
+    const badge = document.createElement('span');
+    badge.className   = `badge ${extStr === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+    badge.textContent = extStr.replace('.', '').toUpperCase();
+
+    const nameEl = document.createElement('span');
+    nameEl.className  = 'detected-name';
+    nameEl.textContent = assetName;
+
+    const verEl = document.createElement('span');
+    verEl.className   = 'detected-ver';
+    verEl.textContent = latest.tag;
+
+    row.appendChild(cb);
+    row.appendChild(badge);
+    row.appendChild(nameEl);
+    row.appendChild(verEl);
+    container.appendChild(row);
+  });
+
+  document.getElementById('source-detected').style.display = '';
+}
+
+async function importSelected() {
+  const rows = document.querySelectorAll('#source-detected-list .detected-row');
+  const btn  = document.getElementById('btn-source-import');
+  btn.disabled    = true;
+  btn.textContent = 'Importing…';
+  let imported = 0;
+
+  for (const row of rows) {
+    const cb = row.querySelector('input[type=checkbox]');
+    if (!cb || !cb.checked) continue;
+    try {
+      let allVersions = [];
+      try { allVersions = JSON.parse(row.dataset.allVersions || '[]'); } catch (_) {}
+      await api('/api/payloads/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo:         row.dataset.repo,
+          asset_name:   row.dataset.assetName,
+          download_url: row.dataset.downloadUrl,
+          version:      row.dataset.version,
+          all_versions: allVersions,
+        }),
+      });
+      imported++;
+    } catch (e) { log(`Import '${row.dataset.assetName}': ${e.message}`, 'error'); }
+  }
+
+  btn.disabled    = false;
+  btn.textContent = 'Import Selected';
+  if (imported > 0) {
+    showToast(`${imported} payload(s) imported`);
+    document.getElementById('source-detected').style.display = 'none';
+    document.getElementById('source-add-panel').style.display = 'none';
+    await refreshPayloads();
+  }
+}
+
+// ── Delete source ────────────────────────────────────────────────
+async function deleteSource(repo) {
+  if (!confirm(`Remove source '${repo}'?\n\nAlready imported payloads will NOT be deleted.`)) return;
+  const [owner, repoName] = repo.split('/');
+  try {
+    await api(`/api/sources/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`, { method: 'DELETE' });
+    await refreshSources();
+  } catch (e) { log('Remove source: ' + e.message, 'error'); }
+}
+
+// ── Check source: detect new payloads + updates ──────────────────
+async function checkSourceUpdates(repo, sourceEl) {
+  // Find the source item element (may be passed directly or looked up)
+  const el = sourceEl || document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
+  const btn = el && el.querySelector('.source-check-btn');
+  const panel = el && el.querySelector('.source-check-panel');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+
+  try {
+    const data = await api(`/api/sources/releases?repo=${encodeURIComponent(repo)}`);
+
+    // Group releases by asset_name (first entry = latest)
+    const byAsset = {};
+    data.releases.forEach(r => {
+      if (!byAsset[r.asset_name]) byAsset[r.asset_name] = [];
+      byAsset[r.asset_name].push(r);
+    });
+
+    // Separate: already-imported payloads vs new (not yet imported)
+    const owned = state.payloads.filter(p => p.source && p.source.repo === repo);
+    const importedAssets = new Set(owned.map(p => p.source.asset));
+    const newAssets = Object.entries(byAsset)
+      .filter(([name]) => !importedAssets.has(name))
+      .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
+
+    // Check updates for existing payloads
+    if (!state.updateResults) state.updateResults = {};
+    let updatesAvail = 0;
+    owned.forEach(p => {
+      const vers = byAsset[p.source.asset];
+      if (vers && vers[0].tag !== p.source.version) {
+        updatesAvail++;
+        state.updateResults[p.name] = {
+          filename:        p.name,
+          repo:            p.source.repo,
+          asset_name:      p.source.asset,
+          current_version: p.source.version,
+          latest_version:  vers[0].tag,
+          download_url:    vers[0].download_url,
+        };
+      }
+    });
+    _renderUpdateBadge(Object.keys(state.updateResults).length);
+    if (updatesAvail) renderPayloads();
+
+    // Populate + show the per-source panel
+    if (panel) _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, owned.length);
+
+    const parts = [];
+    if (newAssets.length)  parts.push(`${newAssets.length} new payload(s)`);
+    if (updatesAvail)      parts.push(`${updatesAvail} update(s) available`);
+    if (!parts.length)     parts.push('All up to date');
+    showToast(parts.join(' · '));
+  } catch (e) { log('Check source: ' + e.message, 'error'); }
+  finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Check'; }
+  }
+}
+
+function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importedCount) {
+  panel.innerHTML = '';
+
+  // Status line
+  const statusLine = document.createElement('div');
+  statusLine.className = 'source-check-status';
+  const parts = [];
+  if (newAssets.length)  parts.push(`${newAssets.length} new payload(s) found`);
+  if (updatesAvail)      parts.push(`${updatesAvail} update(s) available`);
+  if (!parts.length)     parts.push(importedCount ? '✔ All up to date' : '✔ No payloads in this release');
+  const hasWarning = newAssets.length > 0 || updatesAvail > 0;
+  statusLine.textContent = (hasWarning ? '⚠ ' : '') + parts.join(' · ');
+  statusLine.className   = 'source-check-status ' + (hasWarning ? 'warn' : 'ok');
+  panel.appendChild(statusLine);
+
+  // New payloads list (if any)
+  if (newAssets.length) {
+    const hdr = document.createElement('p');
+    hdr.className   = 'source-check-hdr';
+    hdr.textContent = 'New payloads available:';
+    panel.appendChild(hdr);
+
+    const list = document.createElement('div');
+    list.className = 'source-check-list';
+
+    newAssets.forEach(asset => {
+      const extStr = asset.name.includes('.') ? asset.name.slice(asset.name.lastIndexOf('.')).toLowerCase() : '';
+      const row = document.createElement('div');
+      row.className = 'detected-row';
+      row.dataset.repo        = repo;
+      row.dataset.assetName   = asset.name;
+      row.dataset.downloadUrl = asset.latest.download_url;
+      row.dataset.version     = asset.latest.tag;
+      row.dataset.allVersions = JSON.stringify(
+        asset.versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
+      );
+
+      const cb   = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = true;
+
+      const badge = document.createElement('span');
+      badge.className   = `badge ${extStr === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+      badge.textContent = extStr.replace('.', '').toUpperCase() || 'FILE';
+
+      const nameEl = document.createElement('span');
+      nameEl.className   = 'detected-name';
+      nameEl.textContent = asset.name;
+
+      const verEl = document.createElement('span');
+      verEl.className   = 'detected-ver';
+      verEl.textContent = asset.latest.tag;
+
+      row.appendChild(cb); row.appendChild(badge);
+      row.appendChild(nameEl); row.appendChild(verEl);
+      list.appendChild(row);
+    });
+    panel.appendChild(list);
+
+    const importBtn = document.createElement('button');
+    importBtn.className   = 'btn btn-primary btn-sm';
+    importBtn.textContent = 'Import Selected';
+    importBtn.style.cssText = 'width:100%;margin-top:.4rem';
+    importBtn.addEventListener('click', () => _importFromPanel(list, importBtn, panel));
+    panel.appendChild(importBtn);
+  }
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className   = 'btn btn-sm';
+  closeBtn.textContent = '✕ Close';
+  closeBtn.style.cssText = 'margin-top:.35rem;width:100%';
+  closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+  panel.appendChild(closeBtn);
+
+  panel.style.display = '';
+}
+
+async function _importFromPanel(list, btn, panel) {
+  const rows = list.querySelectorAll('.detected-row');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  let imported = 0;
+  for (const row of rows) {
+    const cb = row.querySelector('input[type=checkbox]');
+    if (!cb || !cb.checked) continue;
+    try {
+      let allVersions = [];
+      try { allVersions = JSON.parse(row.dataset.allVersions || '[]'); } catch (_) {}
+      await api('/api/payloads/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo:         row.dataset.repo,
+          asset_name:   row.dataset.assetName,
+          download_url: row.dataset.downloadUrl,
+          version:      row.dataset.version,
+          all_versions: allVersions,
+        }),
+      });
+      imported++;
+    } catch (e) { log(`Import '${row.dataset.assetName}': ${e.message}`, 'error'); }
+  }
+  btn.disabled = false; btn.textContent = 'Import Selected';
+  if (imported > 0) {
+    showToast(`${imported} payload(s) imported`);
+    panel.style.display = 'none';
+    await refreshPayloads();
+  }
+}
+
+function _markPayloadUpdateAvailable(filename, latestRelease) {
+  if (!state.updateResults) state.updateResults = {};
+  const p = state.payloads.find(x => x.name === filename);
+  if (p) state.updateResults[filename] = {
+    filename, repo: p.source.repo, asset_name: p.source.asset,
+    current_version: p.source.version, latest_version: latestRelease.tag,
+    download_url: latestRelease.download_url,
+  };
+  renderPayloads();
+}
+
+// ── Global update check ──────────────────────────────────────────
+async function checkAllUpdates() {
+  if (!state.sources.length) return;
+  const btn = document.getElementById('btn-check-all-updates');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const data = await api('/api/sources/check-updates');
+    if (!state.updateResults) state.updateResults = {};
+    // Reset and repopulate
+    Object.keys(state.updateResults).forEach(k => delete state.updateResults[k]);
+    data.updates.forEach(u => { state.updateResults[u.filename] = u; });
+    state.updateCheckDone = true;
+    _renderUpdateBadge(data.updates.length);
+    renderPayloads(); // always refresh so ✔ Up to date indicators appear
+  } catch (e) { log('Check updates: ' + e.message, 'error'); }
+  finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Check Updates'; }
+  }
+}
+
+function _renderUpdateBadge(count) {
+  const badge = document.getElementById('update-count-badge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = `⚠ ${count} update${count > 1 ? 's' : ''} available`;
+    badge.className   = 'update-count-badge warn';
+    document.getElementById('btn-update-all').style.display = '';
+  } else {
+    badge.textContent = '✔ All up to date';
+    badge.className   = 'update-count-badge ok';
+    document.getElementById('btn-update-all').style.display = 'none';
+  }
+}
+
+async function updateAll() {
+  const updates = Object.values(state.updateResults || {});
+  if (!updates.length) { showToast('Nothing to update'); return; }
+  if (!confirm(`Update ${updates.length} payload(s) to latest versions?`)) return;
+  const btn = document.getElementById('btn-update-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+  let done = 0;
+  for (const u of updates) {
+    try {
+      await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo: u.repo, asset_name: u.asset_name,
+          download_url: u.download_url, version: u.latest_version,
+        }),
+      });
+      delete state.updateResults[u.filename];
+      done++;
+    } catch (e) { log(`Update '${u.filename}': ${e.message}`, 'error'); }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '⬆ Update All'; }
+  showToast(`${done} payload(s) updated`);
+  await refreshPayloads();
+  await checkAllUpdates();
+}
