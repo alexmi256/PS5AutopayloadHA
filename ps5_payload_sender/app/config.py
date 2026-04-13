@@ -1,0 +1,35 @@
+"""Central configuration – all constants and environment variables."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+# ── Runtime ───────────────────────────────────────────────────────
+HOST: str = os.environ.get("PS5_IP", "")
+PORT_CHECK_TIMEOUT: float = float(os.environ.get("PORT_CHECK_TIMEOUT", 10))
+PORT_CHECK_INTERVAL: float = float(int(os.environ.get("PORT_CHECK_INTERVAL", 500)) / 1000)
+SUPERVISOR_TOKEN: str = os.environ.get("SUPERVISOR_TOKEN", "")
+
+# ── Paths ─────────────────────────────────────────────────────────
+APP_DIR    = Path("/app")
+STATIC_DIR = Path(__file__).parent / "static"
+
+CONFIG_BASE  = Path("/config/ps5_autopayload")
+PAYLOAD_DIR  = CONFIG_BASE / "payloads"
+PROFILES_DIR = CONFIG_BASE / "profiles"
+STATE_FILE   = CONFIG_BASE / "config.json"
+DEVICES_FILE = CONFIG_BASE / "devices.json"
+
+# Legacy paths – used once for migration from /data/
+OLD_PAYLOAD_DIR  = Path("/data/payloads")
+OLD_STATE_FILE   = Path("/data/state.json")
+OLD_DEVICES_FILE = Path("/data/devices.json")
+
+# ── Misc ──────────────────────────────────────────────────────────
+APP_VERSION = "1.0.0"
+GITHUB_RAW_CONFIG = (
+    "https://raw.githubusercontent.com/cosmicflow2512/PS5AutopayloadHA"
+    "/main/ps5_payload_sender/config.yaml"
+)
+ALLOWED_PAYLOAD_EXTENSIONS: set[str] = {".lua", ".elf"}
+HIDDEN_PROFILES: set[str] = {"ftp.txt", "goldhen.txt", "_builder_run.txt"}
