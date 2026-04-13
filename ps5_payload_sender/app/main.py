@@ -71,7 +71,11 @@ from ha_client import (
     reload_integration,
     write_ha_services_yaml,
 )
-from github_client import download_payload as gh_download_payload, get_releases as gh_get_releases
+from github_client import (
+    download_payload as gh_download_payload,
+    get_releases as gh_get_releases,
+    scan_repo_files as gh_scan_repo_files,
+)
 from models import (
     AnalyzePortRequest,
     AutoloadRequest,
@@ -289,17 +293,31 @@ async def api_add_source(req: SourceAddRequest):
         raise HTTPException(400, "Invalid repository format. Use 'owner/repo'")
     owner, repo_name = parts[0].strip(), parts[1].strip()
     loop = asyncio.get_running_loop()
+
+    # ── Step 1: scan repo file tree for .elf / .lua ──────────────
+    assets: list = []
     try:
-        assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+        assets = await loop.run_in_executor(executor, gh_scan_repo_files, owner, repo_name)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            raise HTTPException(404, "Repository not found or has no releases")
+            raise HTTPException(404, "Repository not found")
         raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
     except Exception as exc:
         raise HTTPException(502, f"Could not reach GitHub: {exc}")
 
+    # ── Step 2: fall back to releases (ZIP excluded) ─────────────
     if not assets:
-        raise HTTPException(404, "No .elf or .lua files found in any release")
+        try:
+            assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+        except Exception as exc:
+            raise HTTPException(502, f"GitHub API error: {exc}")
+
+    if not assets:
+        raise HTTPException(
+            404,
+            "No .elf or .lua payload files found in this repository or its releases. "
+            "ZIP-only releases are not supported.",
+        )
 
     if req.filter.strip():
         assets = [a for a in assets if fnmatch.fnmatch(a["asset_name"], req.filter.strip())]
@@ -308,16 +326,19 @@ async def api_add_source(req: SourceAddRequest):
 
     slug = f"{owner}/{repo_name}"
 
-    # Build per-asset version list
+    # Build per-asset version list (path preserved for repo_file assets)
     asset_versions: dict = {}
     for a in assets:
         aname = a["asset_name"]
         if aname not in asset_versions:
             asset_versions[aname] = []
-        if not any(v["tag"] == a["tag"] for v in asset_versions[aname]):
-            asset_versions[aname].append({"tag": a["tag"], "download_url": a["download_url"]})
+        entry: dict = {"tag": a["tag"], "download_url": a["download_url"]}
+        if a.get("path"):
+            entry["path"] = a["path"]
+        if not any(v["tag"] == entry["tag"] for v in asset_versions[aname]):
+            asset_versions[aname].append(entry)
 
-    # Auto-link existing local payloads
+    # Auto-link existing local payloads that match asset names
     meta = load_payload_meta()
     auto_linked: list = []
     for aname, versions in asset_versions.items():

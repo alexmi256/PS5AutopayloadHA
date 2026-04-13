@@ -737,3 +737,32 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .header-actions {
   display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
 }
+
+/* ── Detected payload header (label + selection bar) ────────────── */
+.detected-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem;
+}
+.detected-select-bar {
+  display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+}
+.detected-select-bar--inline { margin-bottom: .3rem }
+.detected-count {
+  font-size: .78rem; color: var(--dim); min-width: 4.5rem;
+}
+
+/* ── Detected payload name + path ───────────────────────────────── */
+.detected-name-wrap {
+  display: flex; flex-direction: column; flex: 1; min-width: 0;
+}
+.detected-name  { font-size: .88rem; font-weight: 500; }
+.detected-path  {
+  font-size: .72rem; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Extra-small button variant ─────────────────────────────────── */
+.btn-xs {
+  font-size: .73rem; padding: .15rem .45rem; line-height: 1.4;
+  border-radius: .25rem;
+}

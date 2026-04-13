@@ -97,9 +97,16 @@
 
         <!-- Detected payloads -->
         <div id="source-detected" style="display:none;margin-top:.6rem">
-          <p class="field-label" style="margin-bottom:.35rem">Detected payloads:</p>
-          <div id="source-detected-list"></div>
-          <button id="btn-source-import" class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%">Import Selected</button>
+          <div class="detected-header">
+            <p class="field-label" style="margin-bottom:0">Detected payloads:</p>
+            <div class="detected-select-bar">
+              <button class="btn btn-xs" onclick="_selectAllDetected()">Select All</button>
+              <button class="btn btn-xs" onclick="_deselectAllDetected()">Deselect All</button>
+              <span id="detected-count" class="detected-count"></span>
+            </div>
+          </div>
+          <div id="source-detected-list" style="margin-top:.35rem"></div>
+          <button id="btn-source-import" class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%" disabled>Import Selected</button>
         </div>
       </div>
 

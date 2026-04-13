@@ -56,7 +56,7 @@ function renderSourcesList() {
     const checkBtn = document.createElement('button');
     checkBtn.className = 'btn btn-sm source-check-btn';
     checkBtn.textContent = '↻ Check';
-    checkBtn.title = 'Check for new releases and updates';
+    checkBtn.title = 'Check for new payloads and updates';
     checkBtn.addEventListener('click', () => checkSourceUpdates(src.repo, el));
 
     const delBtn = document.createElement('button');
@@ -98,10 +98,14 @@ async function addSource() {
   const filterInput = document.getElementById('source-filter-input');
   const statusEl    = document.getElementById('source-add-status');
   const repo = _parseRepoInput(repoInput.value);
-  repoInput.value = repo; // show normalized value
-  if (!repo) { statusEl.textContent = 'Enter a repository (e.g. ps5-payload-dev/kstuff)'; statusEl.className = 'source-status error'; return; }
+  repoInput.value = repo;
+  if (!repo) {
+    statusEl.textContent = 'Enter a repository (e.g. ps5-payload-dev/kstuff)';
+    statusEl.className = 'source-status error';
+    return;
+  }
 
-  statusEl.textContent = 'Fetching releases from GitHub…';
+  statusEl.textContent = 'Scanning repository…';
   statusEl.className   = 'source-status loading';
   document.getElementById('source-detected').style.display = 'none';
 
@@ -112,9 +116,10 @@ async function addSource() {
       body: JSON.stringify({ repo, filter: filterInput.value.trim() }),
     });
     const linked = data.auto_linked || [];
+    const src    = data.assets[0]?.source_type === 'repo_file' ? 'repo files' : 'releases';
     const msg = linked.length
-      ? `Found ${data.assets.length} payload(s) — auto-linked: ${linked.join(', ')}`
-      : `Found ${data.assets.length} payload(s)`;
+      ? `Found ${data.assets.length} payload(s) in ${src} — auto-linked: ${linked.join(', ')}`
+      : `Found ${data.assets.length} payload(s) in ${src}`;
     statusEl.textContent = msg;
     statusEl.className   = 'source-status ok';
     _renderDetectedPayloads(data.repo, data.assets);
@@ -123,13 +128,17 @@ async function addSource() {
     repoInput.value   = '';
     filterInput.value = '';
   } catch (e) {
-    const txt = e.message.includes('404') ? 'Repository not found or no releases detected.' :
-                e.message.includes('400') ? 'Invalid format — use owner/repo (e.g. ps5-payload-dev/kstuff)' :
-                'Error: ' + e.message;
+    const txt = e.message.includes('404')
+      ? 'No .elf/.lua payload files found. ZIP-only releases are not supported.'
+      : e.message.includes('400')
+        ? 'Invalid format — use owner/repo (e.g. ps5-payload-dev/kstuff)'
+        : 'Error: ' + e.message;
     statusEl.textContent = txt;
     statusEl.className   = 'source-status error';
   }
 }
+
+// ── Detected payload list ────────────────────────────────────────
 
 function _renderDetectedPayloads(repo, assets) {
   // Group by asset_name, keep all versions
@@ -139,12 +148,12 @@ function _renderDetectedPayloads(repo, assets) {
     byAsset[a.asset_name].push(a);
   });
 
-  const container = document.getElementById('source-detected-list');
-  container.innerHTML = '';
+  const listEl = document.getElementById('source-detected-list');
+  listEl.innerHTML = '';
 
   Object.entries(byAsset).forEach(([assetName, versions]) => {
     const latest = versions[0];
-    const extStr = assetName.includes('.') ? assetName.slice(assetName.lastIndexOf('.')).toLowerCase() : '';
+    const ext    = assetName.includes('.') ? assetName.slice(assetName.lastIndexOf('.')).toLowerCase() : '';
 
     const row = document.createElement('div');
     row.className = 'detected-row';
@@ -152,34 +161,73 @@ function _renderDetectedPayloads(repo, assets) {
     row.dataset.assetName   = assetName;
     row.dataset.downloadUrl = latest.download_url;
     row.dataset.version     = latest.tag;
+    row.dataset.path        = latest.path || '';
     row.dataset.allVersions = JSON.stringify(
-      versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
+      versions.map(v => ({ tag: v.tag, download_url: v.download_url, path: v.path || '' }))
     );
 
     const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = true;
+    cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = false;
+    cb.addEventListener('change', _updateDetectedSelectionUI);
 
     const badge = document.createElement('span');
-    badge.className   = `badge ${extStr === '.lua' ? 'badge-lua' : 'badge-elf'}`;
-    badge.textContent = extStr.replace('.', '').toUpperCase();
+    badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+    badge.textContent = ext.replace('.', '').toUpperCase();
+
+    const nameWrap = document.createElement('span');
+    nameWrap.className = 'detected-name-wrap';
 
     const nameEl = document.createElement('span');
     nameEl.className  = 'detected-name';
     nameEl.textContent = assetName;
+    nameWrap.appendChild(nameEl);
+
+    if (latest.path && latest.path !== assetName) {
+      const pathEl = document.createElement('span');
+      pathEl.className  = 'detected-path';
+      pathEl.textContent = latest.path;
+      nameWrap.appendChild(pathEl);
+    }
 
     const verEl = document.createElement('span');
     verEl.className   = 'detected-ver';
-    verEl.textContent = latest.tag;
+    verEl.textContent = latest.tag !== 'latest' ? latest.tag : '';
 
     row.appendChild(cb);
     row.appendChild(badge);
-    row.appendChild(nameEl);
+    row.appendChild(nameWrap);
     row.appendChild(verEl);
-    container.appendChild(row);
+    listEl.appendChild(row);
   });
 
+  _updateDetectedSelectionUI();
   document.getElementById('source-detected').style.display = '';
 }
+
+// ── Selection helpers ────────────────────────────────────────────
+
+function _updateDetectedSelectionUI() {
+  const cbs = document.querySelectorAll('#source-detected-list input[type=checkbox]');
+  const n   = Array.from(cbs).filter(cb => cb.checked).length;
+  const countEl   = document.getElementById('detected-count');
+  const importBtn = document.getElementById('btn-source-import');
+  if (countEl)   countEl.textContent  = n > 0 ? `${n} selected` : '';
+  if (importBtn) importBtn.disabled   = n === 0;
+}
+
+function _selectAllDetected() {
+  document.querySelectorAll('#source-detected-list input[type=checkbox]')
+    .forEach(cb => { cb.checked = true; });
+  _updateDetectedSelectionUI();
+}
+
+function _deselectAllDetected() {
+  document.querySelectorAll('#source-detected-list input[type=checkbox]')
+    .forEach(cb => { cb.checked = false; });
+  _updateDetectedSelectionUI();
+}
+
+// ── Import selected payloads ─────────────────────────────────────
 
 async function importSelected() {
   const rows = document.querySelectorAll('#source-detected-list .detected-row');
@@ -209,13 +257,15 @@ async function importSelected() {
     } catch (e) { log(`Import '${row.dataset.assetName}': ${e.message}`, 'error'); }
   }
 
-  btn.disabled    = false;
   btn.textContent = 'Import Selected';
   if (imported > 0) {
     showToast(`${imported} payload(s) imported`);
     document.getElementById('source-detected').style.display = 'none';
     document.getElementById('source-add-panel').style.display = 'none';
     await refreshPayloads();
+  } else {
+    btn.disabled = false;
+    _updateDetectedSelectionUI();
   }
 }
 
@@ -231,9 +281,8 @@ async function deleteSource(repo) {
 
 // ── Check source: detect new payloads + updates ──────────────────
 async function checkSourceUpdates(repo, sourceEl) {
-  // Find the source item element (may be passed directly or looked up)
-  const el = sourceEl || document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
-  const btn = el && el.querySelector('.source-check-btn');
+  const el    = sourceEl || document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
+  const btn   = el && el.querySelector('.source-check-btn');
   const panel = el && el.querySelector('.source-check-panel');
 
   if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
@@ -241,21 +290,18 @@ async function checkSourceUpdates(repo, sourceEl) {
   try {
     const data = await api(`/api/sources/releases?repo=${encodeURIComponent(repo)}`);
 
-    // Group releases by asset_name (first entry = latest)
     const byAsset = {};
     data.releases.forEach(r => {
       if (!byAsset[r.asset_name]) byAsset[r.asset_name] = [];
       byAsset[r.asset_name].push(r);
     });
 
-    // Separate: already-imported payloads vs new (not yet imported)
-    const owned = state.payloads.filter(p => p.source && p.source.repo === repo);
+    const owned         = state.payloads.filter(p => p.source && p.source.repo === repo);
     const importedAssets = new Set(owned.map(p => p.source.asset));
     const newAssets = Object.entries(byAsset)
       .filter(([name]) => !importedAssets.has(name))
       .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
 
-    // Check updates for existing payloads
     if (!state.updateResults) state.updateResults = {};
     let updatesAvail = 0;
     owned.forEach(p => {
@@ -275,13 +321,12 @@ async function checkSourceUpdates(repo, sourceEl) {
     _renderUpdateBadge(Object.keys(state.updateResults).length);
     if (updatesAvail) renderPayloads();
 
-    // Populate + show the per-source panel
     if (panel) _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, owned.length);
 
     const parts = [];
-    if (newAssets.length)  parts.push(`${newAssets.length} new payload(s)`);
-    if (updatesAvail)      parts.push(`${updatesAvail} update(s) available`);
-    if (!parts.length)     parts.push('All up to date');
+    if (newAssets.length) parts.push(`${newAssets.length} new payload(s)`);
+    if (updatesAvail)     parts.push(`${updatesAvail} update(s) available`);
+    if (!parts.length)    parts.push('All up to date');
     showToast(parts.join(' · '));
   } catch (e) { log('Check source: ' + e.message, 'error'); }
   finally {
@@ -292,19 +337,16 @@ async function checkSourceUpdates(repo, sourceEl) {
 function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importedCount) {
   panel.innerHTML = '';
 
-  // Status line
   const statusLine = document.createElement('div');
-  statusLine.className = 'source-check-status';
   const parts = [];
-  if (newAssets.length)  parts.push(`${newAssets.length} new payload(s) found`);
-  if (updatesAvail)      parts.push(`${updatesAvail} update(s) available`);
-  if (!parts.length)     parts.push(importedCount ? '✔ All up to date' : '✔ No payloads in this release');
+  if (newAssets.length) parts.push(`${newAssets.length} new payload(s) found`);
+  if (updatesAvail)     parts.push(`${updatesAvail} update(s) available`);
+  if (!parts.length)    parts.push(importedCount ? '✔ All up to date' : '✔ No payloads in this release');
   const hasWarning = newAssets.length > 0 || updatesAvail > 0;
   statusLine.textContent = (hasWarning ? '⚠ ' : '') + parts.join(' · ');
   statusLine.className   = 'source-check-status ' + (hasWarning ? 'warn' : 'ok');
   panel.appendChild(statusLine);
 
-  // New payloads list (if any)
   if (newAssets.length) {
     const hdr = document.createElement('p');
     hdr.className   = 'source-check-hdr';
@@ -314,48 +356,86 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
     const list = document.createElement('div');
     list.className = 'source-check-list';
 
+    const importBtn = document.createElement('button');
+    importBtn.className   = 'btn btn-primary btn-sm';
+    importBtn.textContent = 'Import Selected';
+    importBtn.disabled    = true;
+    importBtn.style.cssText = 'width:100%;margin-top:.4rem';
+
+    const updatePanelCount = () => {
+      const cbs = list.querySelectorAll('input[type=checkbox]');
+      const n = Array.from(cbs).filter(cb => cb.checked).length;
+      importBtn.disabled = n === 0;
+    };
+
+    // Select All / Deselect All bar
+    const bar = document.createElement('div');
+    bar.className = 'detected-select-bar detected-select-bar--inline';
+    const saBtn = document.createElement('button');
+    saBtn.className = 'btn btn-xs'; saBtn.textContent = 'Select All';
+    saBtn.addEventListener('click', () => {
+      list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+      updatePanelCount();
+    });
+    const daBtn = document.createElement('button');
+    daBtn.className = 'btn btn-xs'; daBtn.textContent = 'Deselect All';
+    daBtn.addEventListener('click', () => {
+      list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+      updatePanelCount();
+    });
+    const cntEl = document.createElement('span');
+    cntEl.className = 'detected-count';
+    bar.appendChild(saBtn); bar.appendChild(daBtn); bar.appendChild(cntEl);
+    panel.appendChild(bar);
+
     newAssets.forEach(asset => {
-      const extStr = asset.name.includes('.') ? asset.name.slice(asset.name.lastIndexOf('.')).toLowerCase() : '';
+      const ext = asset.name.includes('.') ? asset.name.slice(asset.name.lastIndexOf('.')).toLowerCase() : '';
       const row = document.createElement('div');
       row.className = 'detected-row';
       row.dataset.repo        = repo;
       row.dataset.assetName   = asset.name;
       row.dataset.downloadUrl = asset.latest.download_url;
       row.dataset.version     = asset.latest.tag;
+      row.dataset.path        = asset.latest.path || '';
       row.dataset.allVersions = JSON.stringify(
         asset.versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
       );
 
-      const cb   = document.createElement('input');
-      cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = true;
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = false;
+      cb.addEventListener('change', updatePanelCount);
 
       const badge = document.createElement('span');
-      badge.className   = `badge ${extStr === '.lua' ? 'badge-lua' : 'badge-elf'}`;
-      badge.textContent = extStr.replace('.', '').toUpperCase() || 'FILE';
+      badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+      badge.textContent = ext.replace('.', '').toUpperCase() || 'FILE';
+
+      const nameWrap = document.createElement('span');
+      nameWrap.className = 'detected-name-wrap';
 
       const nameEl = document.createElement('span');
-      nameEl.className   = 'detected-name';
-      nameEl.textContent = asset.name;
+      nameEl.className = 'detected-name'; nameEl.textContent = asset.name;
+      nameWrap.appendChild(nameEl);
+
+      if (asset.latest.path && asset.latest.path !== asset.name) {
+        const pathEl = document.createElement('span');
+        pathEl.className = 'detected-path'; pathEl.textContent = asset.latest.path;
+        nameWrap.appendChild(pathEl);
+      }
 
       const verEl = document.createElement('span');
-      verEl.className   = 'detected-ver';
-      verEl.textContent = asset.latest.tag;
+      verEl.className = 'detected-ver';
+      verEl.textContent = asset.latest.tag !== 'latest' ? asset.latest.tag : '';
 
       row.appendChild(cb); row.appendChild(badge);
-      row.appendChild(nameEl); row.appendChild(verEl);
+      row.appendChild(nameWrap); row.appendChild(verEl);
       list.appendChild(row);
     });
-    panel.appendChild(list);
 
-    const importBtn = document.createElement('button');
-    importBtn.className   = 'btn btn-primary btn-sm';
-    importBtn.textContent = 'Import Selected';
-    importBtn.style.cssText = 'width:100%;margin-top:.4rem';
+    panel.appendChild(list);
     importBtn.addEventListener('click', () => _importFromPanel(list, importBtn, panel));
     panel.appendChild(importBtn);
   }
 
-  // Close button
   const closeBtn = document.createElement('button');
   closeBtn.className   = 'btn btn-sm';
   closeBtn.textContent = '✕ Close';
@@ -390,23 +470,14 @@ async function _importFromPanel(list, btn, panel) {
       imported++;
     } catch (e) { log(`Import '${row.dataset.assetName}': ${e.message}`, 'error'); }
   }
-  btn.disabled = false; btn.textContent = 'Import Selected';
+  btn.textContent = 'Import Selected';
   if (imported > 0) {
     showToast(`${imported} payload(s) imported`);
     panel.style.display = 'none';
     await refreshPayloads();
+  } else {
+    btn.disabled = false;
   }
-}
-
-function _markPayloadUpdateAvailable(filename, latestRelease) {
-  if (!state.updateResults) state.updateResults = {};
-  const p = state.payloads.find(x => x.name === filename);
-  if (p) state.updateResults[filename] = {
-    filename, repo: p.source.repo, asset_name: p.source.asset,
-    current_version: p.source.version, latest_version: latestRelease.tag,
-    download_url: latestRelease.download_url,
-  };
-  renderPayloads();
 }
 
 // ── Global update check ──────────────────────────────────────────
@@ -417,12 +488,11 @@ async function checkAllUpdates() {
   try {
     const data = await api('/api/sources/check-updates');
     if (!state.updateResults) state.updateResults = {};
-    // Reset and repopulate
     Object.keys(state.updateResults).forEach(k => delete state.updateResults[k]);
     data.updates.forEach(u => { state.updateResults[u.filename] = u; });
     state.updateCheckDone = true;
     _renderUpdateBadge(data.updates.length);
-    renderPayloads(); // always refresh so ✔ Up to date indicators appear
+    renderPayloads();
   } catch (e) { log('Check updates: ' + e.message, 'error'); }
   finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Check Updates'; }
