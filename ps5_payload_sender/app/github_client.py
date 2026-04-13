@@ -38,10 +38,25 @@ def _gh_get(url: str, timeout: int = 15) -> Any:
 
 # ── Repo file scanning ────────────────────────────────────────────
 
-def scan_repo_files(owner: str, repo: str) -> List[Dict[str, Any]]:
+def get_repo_folders(owner: str, repo: str) -> List[str]:
     """
-    Scan the entire repository tree for .elf / .lua files using the Git Trees API
+    Return top-level directory names in the repository.
+    Used to let users select which folder to scan for payloads.
+    """
+    contents = _gh_get(f"{GITHUB_API}/repos/{owner}/{repo}/contents", timeout=10)
+    return sorted(item["name"] for item in contents if item.get("type") == "dir")
+
+
+def scan_repo_files(
+    owner: str, repo: str, folder: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Scan the repository tree for .elf / .lua files using the Git Trees API
     (single recursive call).  Results are cached for _CACHE_TTL seconds.
+
+    If *folder* is given (e.g. "payloads"), only files under that folder are
+    returned.  The full tree is always fetched and cached so repeated calls
+    with different folder values are cheap.
 
     Returns a list of:
       { asset_name, path, download_url, sha, tag:"latest", ext, is_zip:False,
@@ -52,11 +67,20 @@ def scan_repo_files(owner: str, repo: str) -> List[Dict[str, Any]]:
     if key in _tree_cache:
         cached_at, cached = _tree_cache[key]
         if now - cached_at < _CACHE_TTL:
-            return cached
+            return _filter_by_folder(cached, folder)
 
     result = _do_scan_repo_files(owner, repo)
     _tree_cache[key] = (now, result)
-    return result
+    return _filter_by_folder(result, folder)
+
+
+def _filter_by_folder(
+    files: List[Dict[str, Any]], folder: Optional[str]
+) -> List[Dict[str, Any]]:
+    if not folder:
+        return files
+    prefix = folder.strip("/") + "/"
+    return [f for f in files if f["path"].startswith(prefix)]
 
 
 def _do_scan_repo_files(owner: str, repo: str) -> List[Dict[str, Any]]:

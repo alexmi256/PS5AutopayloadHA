@@ -37,6 +37,8 @@ class DeviceList(BaseModel):
 class SourceAddRequest(BaseModel):
     repo: str
     filter: str = ""
+    source_type: str = "auto"   # "auto" | "releases" | "folder"
+    folder: str = ""            # only used when source_type == "folder"
 
 
 class ImportPayloadRequest(BaseModel):

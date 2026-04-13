@@ -91,6 +91,60 @@ function toggleAddSourcePanel() {
     document.getElementById('source-detected').style.display = 'none';
     document.getElementById('source-add-status').textContent = '';
     document.getElementById('source-add-status').className = 'source-status';
+    _onSourceTypeChange();  // sync folder wrap visibility
+  }
+}
+
+// ── Source-type radio toggle ─────────────────────────────────────
+function _onSourceTypeChange() {
+  const type = _getSourceType();
+  const folderWrap = document.getElementById('source-folder-wrap');
+  if (folderWrap) folderWrap.style.display = type === 'folder' ? '' : 'none';
+}
+
+function _getSourceType() {
+  const el = document.querySelector('input[name="src-type"]:checked');
+  return el ? el.value : 'auto';
+}
+
+// ── Fetch repo folders ────────────────────────────────────────────
+async function loadRepoFolders() {
+  const repoInput = document.getElementById('source-repo-input');
+  const repo = _parseRepoInput(repoInput.value);
+  if (!repo) {
+    showToast('Enter a repository first');
+    return;
+  }
+  const sel    = document.getElementById('source-folder-select');
+  const hint   = document.getElementById('source-folder-hint');
+  const btn    = document.getElementById('btn-load-folders');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+  try {
+    const data = await api(`/api/sources/tree?repo=${encodeURIComponent(repo)}`);
+    const folders = data.folders || [];
+    sel.innerHTML = '<option value="">– select a folder –</option>';
+    folders.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f; opt.textContent = f;
+      sel.appendChild(opt);
+    });
+    // Smart default: suggest payloads / bin / build
+    const SUGGEST = ['payloads', 'bin', 'build', 'releases'];
+    const suggested = folders.find(f => SUGGEST.includes(f.toLowerCase()));
+    if (suggested) {
+      sel.value = suggested;
+      if (hint) hint.textContent = `Suggested: /${suggested}`;
+    } else {
+      if (hint) hint.textContent = '';
+    }
+    if (!folders.length) {
+      sel.innerHTML = '<option value="">No sub-folders found</option>';
+    }
+  } catch (e) {
+    showToast('Could not load folders: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Load'; }
   }
 }
 
@@ -106,7 +160,15 @@ async function addSource() {
     return;
   }
 
-  statusEl.textContent = 'Scanning repository…';
+  const sourceType = _getSourceType();
+  const folder     = sourceType === 'folder'
+    ? (document.getElementById('source-folder-select')?.value || '')
+    : '';
+
+  const scanLabel = sourceType === 'releases' ? 'releases'
+    : sourceType === 'folder' ? `folder /${folder || '(root)'}`
+    : 'repository';
+  statusEl.textContent = `Scanning ${scanLabel}…`;
   statusEl.className   = 'source-status loading';
   document.getElementById('source-detected').style.display = 'none';
 
@@ -114,7 +176,12 @@ async function addSource() {
     const data = await api('/api/sources', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repo, filter: filterInput.value.trim() }),
+      body: JSON.stringify({
+        repo,
+        filter:      filterInput.value.trim(),
+        source_type: sourceType,
+        folder,
+      }),
     });
     const linked = data.auto_linked || [];
     const src    = data.assets[0]?.source_type === 'repo_file' ? 'repo files' : 'releases';

@@ -75,6 +75,7 @@ from ha_client import (
 from github_client import (
     download_payload as gh_download_payload,
     get_releases as gh_get_releases,
+    get_repo_folders as gh_get_repo_folders,
     scan_repo_files as gh_scan_repo_files,
 )
 from models import (
@@ -289,6 +290,23 @@ async def api_get_sources():
     return {"sources": load_sources()}
 
 
+@app.get("/api/sources/tree")
+async def api_sources_tree(repo: str):
+    """Return top-level folder names for a GitHub repository."""
+    parts = repo.strip().split("/")
+    if len(parts) != 2 or not all(p.strip() for p in parts):
+        raise HTTPException(400, "Invalid repository format. Use 'owner/repo'")
+    owner, repo_name = parts[0].strip(), parts[1].strip()
+    loop = asyncio.get_running_loop()
+    try:
+        folders = await loop.run_in_executor(executor, gh_get_repo_folders, owner, repo_name)
+        return {"folders": folders}
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(exc.code, f"GitHub API error: HTTP {exc.code}")
+    except Exception as exc:
+        raise HTTPException(502, str(exc))
+
+
 @app.post("/api/sources")
 async def api_add_source(req: SourceAddRequest):
     parts = req.repo.strip().split("/")
@@ -297,29 +315,55 @@ async def api_add_source(req: SourceAddRequest):
     owner, repo_name = parts[0].strip(), parts[1].strip()
     loop = asyncio.get_running_loop()
 
-    # ── Step 1: scan repo file tree for .elf / .lua ──────────────
     assets: list = []
-    try:
-        assets = await loop.run_in_executor(executor, gh_scan_repo_files, owner, repo_name)
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            raise HTTPException(404, "Repository not found")
-        raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
-    except Exception as exc:
-        raise HTTPException(502, f"Could not reach GitHub: {exc}")
 
-    # ── Step 2: fall back to releases (ZIP excluded) ─────────────
-    if not assets:
+    if req.source_type == "releases":
+        # ── Releases only ────────────────────────────────────────
         try:
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                raise HTTPException(404, "Repository not found")
+            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
         except Exception as exc:
-            raise HTTPException(502, f"GitHub API error: {exc}")
+            raise HTTPException(502, f"Could not reach GitHub: {exc}")
+
+    elif req.source_type == "folder":
+        # ── Specific folder scan ─────────────────────────────────
+        folder = req.folder.strip().strip("/") or None
+        try:
+            assets = await loop.run_in_executor(
+                executor, gh_scan_repo_files, owner, repo_name, folder
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                raise HTTPException(404, "Repository not found")
+            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
+        except Exception as exc:
+            raise HTTPException(502, f"Could not reach GitHub: {exc}")
+
+    else:
+        # ── Auto: repo files → fall back to releases ─────────────
+        try:
+            assets = await loop.run_in_executor(executor, gh_scan_repo_files, owner, repo_name)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                raise HTTPException(404, "Repository not found")
+            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
+        except Exception as exc:
+            raise HTTPException(502, f"Could not reach GitHub: {exc}")
+
+        if not assets:
+            try:
+                assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+            except Exception as exc:
+                raise HTTPException(502, f"GitHub API error: {exc}")
 
     if not assets:
         raise HTTPException(
             404,
-            "No .elf or .lua payload files found in this repository or its releases. "
-            "ZIP-only releases are not supported.",
+            "No .elf or .lua payload files found. "
+            "Try a different source type or folder.",
         )
 
     if req.filter.strip():
@@ -356,7 +400,12 @@ async def api_add_source(req: SourceAddRequest):
 
     sources = load_sources()
     if not any(s["repo"] == slug for s in sources):
-        sources.append({"repo": slug, "filter": req.filter.strip()})
+        sources.append({
+            "repo": slug,
+            "filter": req.filter.strip(),
+            "source_type": req.source_type,
+            "folder": req.folder.strip(),
+        })
         save_sources(sources)
 
     return {"success": True, "repo": slug, "assets": assets, "auto_linked": auto_linked}

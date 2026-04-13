@@ -861,3 +861,42 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   .collapse-header { min-height: 44px }
   .flow-timeline   { max-height: 160px }
 }
+
+/* ── Global flow selector + action bar (header row 3) ──────────── */
+.header-row-actions {
+  padding-top: .3rem;
+  border-top: 1px solid var(--border);
+  margin-top: .15rem;
+}
+.flow-selector-wrap {
+  display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0;
+}
+.flow-sel-label {
+  font-size: .73rem; font-weight: 600; color: var(--muted);
+  white-space: nowrap; flex-shrink: 0;
+}
+.flow-select {
+  flex: 1; min-width: 0; font-size: .82rem;
+  padding: .22rem .4rem; height: auto;
+}
+.action-btns {
+  display: flex; gap: .35rem; flex-shrink: 0;
+}
+
+/* ── Green button variant ───────────────────────────────────────── */
+.btn-green {
+  background: var(--green); color: #fff;
+  border-color: transparent;
+}
+.btn-green:hover:not(:disabled) { background: var(--grn-dk) }
+.btn-green:disabled { opacity: .4; cursor: not-allowed }
+
+/* ── Source type radio row ──────────────────────────────────────── */
+.source-type-row {
+  display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .2rem;
+}
+.radio-label {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .85rem; cursor: pointer;
+}
+.radio-label input[type="radio"] { accent-color: var(--primary) }

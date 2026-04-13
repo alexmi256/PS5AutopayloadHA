@@ -35,6 +35,20 @@
           <button onclick="importConfig()" class="btn btn-xs" title="Import config backup">⬆ Import</button>
         </div>
       </div>
+      <!-- Row 3: global flow selector + action buttons -->
+      <div class="header-row header-row-actions">
+        <div class="flow-selector-wrap">
+          <label class="flow-sel-label" for="global-flow-select">Flow:</label>
+          <select id="global-flow-select" class="input select flow-select">
+            <option value="">– Select flow –</option>
+          </select>
+        </div>
+        <div class="action-btns">
+          <button id="btn-global-run"     class="btn btn-green btn-sm" onclick="globalRun()"     disabled title="Run selected flow">▶ Run</button>
+          <button id="btn-global-analyze" class="btn btn-primary btn-sm" onclick="globalAnalyze()" disabled title="Analyze selected flow">📊 Analyze</button>
+          <button id="btn-global-stop"    class="btn btn-danger btn-sm" onclick="globalStop()"    style="display:none" title="Stop execution">⏹ Stop</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -99,9 +113,42 @@
           <div class="field-group">
             <label class="field-label" for="source-repo-input">Repository <span class="field-hint">owner/repo</span></label>
             <input type="text" id="source-repo-input" class="input"
-              placeholder="e.g. ps5-payload-dev/kstuff"
+              placeholder="e.g. EchoStretch/kstuff-lite"
               autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
           </div>
+
+          <!-- Source type -->
+          <div class="field-group">
+            <label class="field-label">Source Type</label>
+            <div class="source-type-row">
+              <label class="radio-label">
+                <input type="radio" name="src-type" value="auto" checked onchange="_onSourceTypeChange()" />
+                Auto
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="src-type" value="releases" onchange="_onSourceTypeChange()" />
+                Releases
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="src-type" value="folder" onchange="_onSourceTypeChange()" />
+                Folder
+              </label>
+            </div>
+            <span class="field-hint" style="margin-top:.2rem;display:block">Auto scans repo files then falls back to releases</span>
+          </div>
+
+          <!-- Folder picker (only shown for Folder type) -->
+          <div id="source-folder-wrap" class="field-group" style="display:none">
+            <label class="field-label">Folder</label>
+            <div class="row-gap">
+              <select id="source-folder-select" class="input select" style="flex:1">
+                <option value="">– enter repo above, then Load –</option>
+              </select>
+              <button id="btn-load-folders" class="btn btn-sm" onclick="loadRepoFolders()">Load</button>
+            </div>
+            <span id="source-folder-hint" class="field-hint" style="margin-top:.2rem;display:block"></span>
+          </div>
+
           <div class="field-group">
             <label class="field-label" for="source-filter-input">Asset filter <span class="field-hint">optional, e.g. *.elf</span></label>
             <input type="text" id="source-filter-input" class="input"
@@ -415,6 +462,7 @@
   <script src="static/js/PortTiming.js"></script>
   <script src="static/js/FlowAnalysis.js"></script>
   <script src="static/js/CollapsibleSections.js"></script>
+  <script src="static/js/FlowSelector.js"></script>
   <script src="static/js/init.js"></script>
 </body>
 </html>
