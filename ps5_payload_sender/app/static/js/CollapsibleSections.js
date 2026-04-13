@@ -1,9 +1,10 @@
 'use strict';
 
 // ── Collapsible section manager ──────────────────────────────────
-// Sections marked with class="collapsible" on their <section> element
-// get click-to-collapse behaviour on their .collapse-toggle header row.
-// Collapsed state persists in sessionStorage (resets on page reload).
+// Sections with class="collapsible" on <section> get click-to-collapse
+// behaviour via their .collapse-header child.
+// The .collapse-arrow child rotates 90° when the section is open.
+// State persists in sessionStorage (resets on page reload / restart).
 
 const _COLLAPSED_KEY = 'ps5_sections_collapsed';
 
@@ -14,31 +15,30 @@ function initCollapsible() {
   } catch (_) {}
 
   document.querySelectorAll('.collapsible').forEach(card => {
-    const toggle = card.querySelector('.collapse-toggle');
+    const header = card.querySelector('.collapse-header');
     const body   = card.querySelector('.collapse-body');
-    const icon   = card.querySelector('.collapse-icon');
+    const arrow  = card.querySelector('.collapse-arrow');
     const id     = card.id;
-    if (!toggle || !body) return;
+    if (!header || !body) return;
 
-    // Restore saved state
-    if (savedState[id]) {
+    // Restore saved state.  true → collapsed.
+    // HTML starts with arrow.open on all sections (= open).
+    if (savedState[id] === true) {
       body.classList.add('collapsed');
-      if (icon) icon.textContent = '▼';
+      if (arrow) arrow.classList.remove('open');
     }
 
-    toggle.addEventListener('click', e => {
-      // Don't collapse when clicking an interactive element inside the header
-      if (e.target.closest('button, a, input, select, label')) return;
+    header.addEventListener('click', () => {
       const isNowCollapsed = body.classList.toggle('collapsed');
-      if (icon) icon.textContent = isNowCollapsed ? '▼' : '▲';
+      if (arrow) arrow.classList.toggle('open', !isNowCollapsed);
       savedState[id] = isNowCollapsed;
       sessionStorage.setItem(_COLLAPSED_KEY, JSON.stringify(savedState));
     });
   });
 }
 
-// ── Section summary updaters ─────────────────────────────────────
-// Call these whenever the underlying data changes.
+// ── Section summary badges ───────────────────────────────────────
+// Called automatically after every data refresh.
 
 function updateSourcesSummary() {
   const el = document.getElementById('summary-sources');

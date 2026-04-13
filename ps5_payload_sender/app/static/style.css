@@ -768,31 +768,50 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 }
 
 /* ── Collapsible sections ──────────────────────────────────────── */
-.collapse-toggle {
+.collapse-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
+  /* negative margin so hover bg bleeds to card edge */
+  margin: -.55rem -.85rem .55rem;
+  padding: .55rem .85rem;
+  border-radius: .45rem .45rem 0 0;
+  transition: background .13s ease;
 }
-.collapse-toggle:hover .card-title { opacity: .85 }
+.collapse-header:hover  { background: rgba(128,128,128,.07) }
+.collapse-header:active { background: rgba(128,128,128,.13) }
 
-.collapse-body {
-  overflow: hidden;
-  transition: opacity .18s ease;
-}
-.collapse-body.collapsed {
-  display: none;
-}
-
-.collapse-icon {
-  font-size: .78rem; color: var(--dim);
-  flex-shrink: 0; margin-left: .2rem;
+/* Arrow: ▶ rotated 90° = open (pointing down), 0° = closed */
+.collapse-arrow {
+  font-size: .68rem;
+  color: var(--dim);
+  flex-shrink: 0;
+  display: inline-block;
   transition: transform .18s ease;
+  transform: rotate(0deg);
+}
+.collapse-arrow.open { transform: rotate(90deg) }
+
+/* Title inside header has no bottom margin */
+.collapse-header .card-title { margin-bottom: 0; flex-shrink: 0 }
+
+/* Summary text pushed to far right */
+.collapse-summary {
+  margin-left: auto;
+  font-size: .75rem; font-weight: 400;
+  color: var(--dim);
+  white-space: nowrap; padding-left: .4rem; flex-shrink: 0;
 }
 
-.collapse-summary {
-  font-size: .75rem; font-weight: 400;
-  color: var(--dim); margin-left: .5rem;
-  vertical-align: middle;
+.collapse-body.collapsed { display: none }
+
+/* Action buttons at the top of a collapse-body */
+.section-actions {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+  margin-bottom: .6rem;
 }
 
 /* ── Section sub-header (inside card body) ──────────────────────── */
@@ -832,8 +851,8 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .flow-hints  { margin-top: .5rem; border-top: 1px solid var(--border); padding-top: .4rem }
 .flow-hint   { font-size: .78rem; color: var(--log-warn); padding: .1rem 0 }
 
-/* ── Mobile: larger tap targets for collapse toggles ────────────── */
+/* ── Mobile: larger tap targets for collapse headers ────────────── */
 @media (max-width: 480px) {
-  .collapse-toggle { min-height: 44px; align-items: center }
+  .collapse-header { min-height: 44px }
   .flow-timeline   { max-height: 160px }
 }

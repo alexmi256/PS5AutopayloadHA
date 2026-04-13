@@ -69,14 +69,17 @@
 
     <!-- PAYLOAD SOURCES (collapsible) -->
     <section class="card collapsible" id="section-sources">
-      <div class="card-header-row collapse-toggle" data-section="sources">
-        <h2 class="card-title">Payload Sources <span class="collapse-summary" id="summary-sources"></span></h2>
-        <div class="row-gap">
-          <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
-          <span class="collapse-icon" aria-hidden="true">▲</span>
-        </div>
+      <div class="collapse-header">
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Payload Sources</h2>
+        <span class="collapse-summary" id="summary-sources"></span>
       </div>
       <div class="collapse-body">
+        <div class="section-actions">
+          <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
+          <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
+          <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
+        </div>
         <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
 
         <!-- Add source panel -->
@@ -118,29 +121,28 @@
           <div class="empty-state">No sources added yet.</div>
         </div>
 
-        <!-- Global update controls -->
+        <!-- Update badge -->
         <div id="update-controls" class="update-controls">
           <span id="update-count-badge" class="update-count-badge"></span>
-          <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
-          <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
         </div>
       </div>
     </section>
 
     <!-- PAYLOADS (collapsible) -->
     <section class="card collapsible" id="section-payloads">
-      <div class="card-header-row collapse-toggle" data-section="payloads">
-        <h2 class="card-title">Payloads <span class="collapse-summary" id="summary-payloads"></span></h2>
-        <div class="row-gap">
-          <button id="btn-refresh-payloads" class="btn btn-sm">↻</button>
-          <label class="btn btn-sm">
-            + Add
-            <input type="file" id="payload-upload" accept=".lua,.elf" multiple style="display:none" />
-          </label>
-          <span class="collapse-icon" aria-hidden="true">▲</span>
-        </div>
+      <div class="collapse-header">
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Payloads</h2>
+        <span class="collapse-summary" id="summary-payloads"></span>
       </div>
       <div class="collapse-body">
+        <div class="section-actions">
+          <button id="btn-refresh-payloads" class="btn btn-sm">↻ Refresh</button>
+          <label class="btn btn-sm">
+            + Add Payload
+            <input type="file" id="payload-upload" accept=".lua,.elf" multiple style="display:none" />
+          </label>
+        </div>
 
         <!-- Filter tabs: All / ⭐ Favorites / ELF / LUA -->
         <div id="payload-filters" class="payload-filters"></div>
@@ -173,10 +175,11 @@
     </section>
 
     <!-- AUTO-LOAD BUILDER (collapsible) -->
-    <section id="builder-card" class="card collapsible" id="section-builder">
-      <div class="card-header-row collapse-toggle" data-section="builder">
-        <h2 class="card-title">Auto-Load Builder <span class="collapse-summary" id="summary-builder"></span></h2>
-        <span class="collapse-icon" aria-hidden="true">▲</span>
+    <section id="section-builder" class="card collapsible">
+      <div class="collapse-header">
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Auto-Load Builder</h2>
+        <span class="collapse-summary" id="summary-builder"></span>
       </div>
       <div class="collapse-body">
 
@@ -257,14 +260,15 @@
 
     <!-- SAVED PROFILES (collapsible) -->
     <section class="card collapsible" id="section-profiles">
-      <div class="card-header-row collapse-toggle" data-section="profiles">
-        <h2 class="card-title">Saved Profiles <span class="collapse-summary" id="summary-profiles"></span></h2>
-        <div class="row-gap">
-          <button id="btn-refresh-profiles" class="btn btn-sm">↻</button>
-          <span class="collapse-icon" aria-hidden="true">▲</span>
-        </div>
+      <div class="collapse-header">
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Saved Profiles</h2>
+        <span class="collapse-summary" id="summary-profiles"></span>
       </div>
       <div class="collapse-body">
+        <div class="section-actions">
+          <button id="btn-refresh-profiles" class="btn btn-sm">↻ Refresh</button>
+        </div>
         <label class="checkbox-label" style="margin-bottom:.75rem">
           <input type="checkbox" id="continue-on-error" />
           Continue on error
@@ -277,12 +281,10 @@
 
     <!-- FLOW & PORT ANALYSIS (collapsible) -->
     <section class="card collapsible" id="section-analysis">
-      <div class="card-header-row collapse-toggle" data-section="analysis">
-        <h2 class="card-title">Flow &amp; Port Analysis <span class="collapse-summary" id="summary-analysis"></span></h2>
-        <div class="row-gap">
-          <button onclick="clearFlowRuns()" class="btn btn-sm" title="Clear flow history">✕ Clear</button>
-          <span class="collapse-icon" aria-hidden="true">▲</span>
-        </div>
+      <div class="collapse-header">
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Flow &amp; Port Analysis</h2>
+        <span class="collapse-summary" id="summary-analysis"></span>
       </div>
       <div class="collapse-body">
 
@@ -292,8 +294,11 @@
             <input type="checkbox" id="flow-safe-mode" checked />
             Safe Mode — don't send real payloads
           </label>
-          <button id="btn-analyze-flow" class="btn btn-primary" style="width:100%;margin-top:.5rem"
-            onclick="startFlowAnalysis()">▶ Analyze Flow</button>
+          <div class="row-gap" style="margin-top:.5rem">
+            <button id="btn-analyze-flow" class="btn btn-primary" style="flex:1"
+              onclick="startFlowAnalysis()">▶ Analyze Flow</button>
+            <button onclick="clearFlowRuns()" class="btn btn-sm" title="Clear history">✕ Clear</button>
+          </div>
         </div>
 
         <!-- Timeline output -->
