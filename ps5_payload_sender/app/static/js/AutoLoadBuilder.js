@@ -113,8 +113,6 @@ function handleExecState(execState, profile) {
   // Sync Quick Start tiles and profile list
   if (typeof renderFavorites === 'function')      renderFavorites();
   if (typeof renderProfileList === 'function')    renderProfileList();
-  // Sync sticky action bar (lock/unlock flow selector)
-  if (typeof setFlowRunning === 'function')       setFlowRunning(active);
 }
 
 // ── Dropdown ─────────────────────────────────────────────────────

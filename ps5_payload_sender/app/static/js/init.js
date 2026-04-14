@@ -120,9 +120,7 @@ async function init() {
   updateBuilderSummary();
   await refreshProfiles();
   updateProfilesSummary();
-  await loadFlowRuns();
   initCollapsible();
-  initFlowSelector();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();

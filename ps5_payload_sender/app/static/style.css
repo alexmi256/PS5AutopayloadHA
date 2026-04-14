@@ -743,6 +743,16 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
 }
 
+/* ── Header Advanced Mode toggle ─────────────────────────────────── */
+.header-adv-toggle {
+  display: flex; align-items: center; gap: .35rem;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  border-right: 1px solid var(--border); padding-right: .45rem; margin-right: .05rem;
+}
+.header-adv-label {
+  font-size: .72rem; font-weight: 600; color: var(--muted); white-space: nowrap;
+}
+
 /* ── Detected payload header (label + selection bar) ────────────── */
 .detected-header {
   display: flex; align-items: center; justify-content: space-between;

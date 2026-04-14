@@ -31,6 +31,13 @@
           <span id="version-badge" class="version-badge">v–</span>
         </div>
         <div class="header-actions">
+          <label class="header-adv-toggle" title="Advanced Mode — enable developer tools">
+            <span class="header-adv-label">Advanced</span>
+            <div class="toggle-switch" style="flex-shrink:0">
+              <input type="checkbox" id="advanced-mode-toggle" />
+              <span class="toggle-slider"></span>
+            </div>
+          </label>
           <button onclick="exportConfig()" class="btn btn-xs" title="Export config backup">⬇ Export</button>
           <button onclick="importConfig()" class="btn btn-xs" title="Import config backup">⬆ Import</button>
           <button onclick="resetConfig()"  class="btn btn-xs btn-danger" title="Factory reset — deletes all config">↺ Reset</button>
@@ -64,13 +71,6 @@
         <span id="ip-warn" class="ip-warn" style="display:none">Invalid IP address</span>
       </div>
 
-      <div class="toggle-row">
-        <label class="toggle-switch">
-          <input type="checkbox" id="advanced-mode-toggle" />
-          <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label-text">Advanced Mode (show port overrides)</span>
-      </div>
     </section>
 
     <!-- QUICK START (always open) -->
@@ -336,88 +336,48 @@
     </section>
 
     <!-- Hint shown when Advanced Mode is OFF -->
-    <p class="adv-hint">Enable <strong>Advanced Mode</strong> in Connection to access analysis tools.</p>
+    <p class="adv-hint">Enable <strong>Advanced Mode</strong> (top right) for Port Checker and Execution Log.</p>
 
-    <!-- ANALYSIS (collapsible, only visible in Advanced Mode) -->
-    <section class="card collapsible advanced-only" id="section-analysis">
-      <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
-        <h2 class="card-title">Analysis</h2>
-        <span class="collapse-summary" id="summary-analysis"></span>
+    <!-- PORT CHECKER + LOG (advanced mode only) -->
+    <section class="card advanced-only" id="section-tools">
+      <h2 class="card-title">Port Checker</h2>
+      <div class="port-check-grid" style="margin-top:.4rem">
+        <div>
+          <label class="field-label" for="check-port">Port</label>
+          <input type="number" id="check-port" class="input" value="9021" min="1" max="65535" />
+        </div>
+        <div>
+          <label class="field-label" for="check-interval">Interval (ms)</label>
+          <input type="number" id="check-interval" class="input" value="500" min="100" />
+        </div>
+        <div>
+          <label class="field-label" for="check-timeout">Timeout (s)</label>
+          <input type="number" id="check-timeout" class="input" value="10" min="1" />
+        </div>
       </div>
-      <div class="collapse-body">
+      <div class="row-gap" style="margin-top:.5rem">
+        <button id="btn-check-once" class="btn btn-primary btn-sm" style="flex:1">Check Once</button>
+        <button id="btn-wait-port"  class="btn btn-sm"             style="flex:1">Wait Until Reachable</button>
+      </div>
+      <div id="port-check-result" style="display:none;margin-top:.6rem"></div>
 
-        <!-- Flow control bar -->
-        <div class="flow-control-bar">
-          <div class="flow-selector-wrap">
-            <label class="flow-sel-label" for="global-flow-select">Flow:</label>
-            <select id="global-flow-select" class="input select flow-select">
-              <option value="">– Select flow –</option>
+      <!-- Execution Log -->
+      <div style="margin-top:.75rem">
+        <div class="card-header-row" style="margin-bottom:.3rem">
+          <span class="section-subheader">Execution Log</span>
+          <div class="row-gap">
+            <select id="log-filter" class="input select" style="font-size:.78rem" onchange="applyLogFilter()">
+              <option value="all">All logs</option>
+              <option value="port">Port</option>
+              <option value="payload">Payload</option>
             </select>
-          </div>
-          <div class="action-btns">
-            <button id="btn-global-analyze" class="btn btn-primary btn-sm" onclick="globalAnalyze()" disabled title="Analyze selected flow">📊 Analyze</button>
-            <button id="btn-global-stop"    class="btn btn-danger btn-sm" onclick="globalStop()"    style="display:none" title="Stop execution">⏹ Stop</button>
+            <button onclick="exportLog('txt')" class="btn btn-xs">⬇ TXT</button>
+            <button id="btn-clear-log" class="btn btn-xs">Clear</button>
           </div>
         </div>
-
-        <!-- Safe mode + clear -->
-        <div class="flow-controls">
-          <label class="checkbox-label">
-            <input type="checkbox" id="flow-safe-mode" checked />
-            Safe Mode — don't send real payloads
-          </label>
-          <button onclick="clearFlowRuns()" class="btn btn-xs" style="margin-top:.35rem" title="Clear history">✕ Clear History</button>
+        <div id="status-log" class="status-log">
+          <div class="log-entry log-info"><span class="log-ts">--:--:--</span> Ready …</div>
         </div>
-
-        <!-- Timeline output -->
-        <div id="flow-timeline" class="flow-timeline">
-          <p class="section-hint">Select a flow above and click Analyze to see step-by-step timing.</p>
-        </div>
-
-        <!-- Manual port check (compact) -->
-        <div style="margin-top:.75rem">
-          <span class="section-subheader">Manual Port Check</span>
-          <div class="port-check-grid" style="margin-top:.4rem">
-            <div>
-              <label class="field-label" for="check-port">Port</label>
-              <input type="number" id="check-port" class="input" value="9021" min="1" max="65535" />
-            </div>
-            <div>
-              <label class="field-label" for="check-interval">Interval (ms)</label>
-              <input type="number" id="check-interval" class="input" value="500" min="100" />
-            </div>
-            <div>
-              <label class="field-label" for="check-timeout">Timeout (s)</label>
-              <input type="number" id="check-timeout" class="input" value="10" min="1" />
-            </div>
-          </div>
-          <div class="row-gap" style="margin-top:.5rem">
-            <button id="btn-check-once" class="btn btn-primary btn-sm" style="flex:1">Check Once</button>
-            <button id="btn-wait-port"  class="btn btn-sm"             style="flex:1">Wait Until Reachable</button>
-          </div>
-          <div id="port-check-result" style="display:none;margin-top:.6rem"></div>
-        </div>
-
-        <!-- Execution log -->
-        <div style="margin-top:.75rem">
-          <div class="card-header-row" style="margin-bottom:.3rem">
-            <span class="section-subheader">Execution Log</span>
-            <div class="row-gap">
-              <select id="log-filter" class="input select" style="font-size:.78rem" onchange="applyLogFilter()">
-                <option value="all">All logs</option>
-                <option value="port">Port timing</option>
-                <option value="payload">Payload execution</option>
-              </select>
-              <button onclick="exportLog('txt')" class="btn btn-xs">⬇ TXT</button>
-              <button id="btn-clear-log" class="btn btn-xs">Clear</button>
-            </div>
-          </div>
-          <div id="status-log" class="status-log">
-            <div class="log-entry log-info"><span class="log-ts">--:--:--</span> Ready …</div>
-          </div>
-        </div>
-
       </div>
     </section>
 
@@ -456,9 +416,7 @@
   <script src="static/js/PayloadSources.js"></script>
   <script src="static/js/ConfigBackup.js"></script>
   <script src="static/js/PortTiming.js"></script>
-  <script src="static/js/FlowAnalysis.js"></script>
   <script src="static/js/CollapsibleSections.js"></script>
-  <script src="static/js/FlowSelector.js"></script>
   <script src="static/js/init.js"></script>
 </body>
 </html>
