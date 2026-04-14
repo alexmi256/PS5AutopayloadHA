@@ -6,7 +6,7 @@
 
 ### Fully Automated PS5 Payload Execution via Home Assistant
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](https://github.com/cosmicflow2512/PS5AutopayloadHA)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=flat-square)](https://github.com/cosmicflow2512/PS5AutopayloadHA)
 [![HA](https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
@@ -88,17 +88,24 @@ The ELF Loader:
 
 ## Features
 
-- Upload `.elf` and `.lua` payloads
-- Favorites system
-- Search & filtering
-- Visual Auto-Load Builder
-- Delay steps
-- Wait-for-port (interval + timeout)
-- ⚡ Quick Start (one-click execution)
-- Persistent configuration (no data loss)
-- Run / Stop / Pause / Resume
-- Multi-select payload management
-- Clean UI optimized for Home Assistant
+- Upload `.elf`, `.bin` and `.lua` payloads (including ZIP archives)
+- Visual Auto-Load Builder — Send / Delay / Wait-for-Port steps
+- Drag-and-drop step reordering
+- Export autoload.zip for USB-based delivery
+- GitHub Payload Sources — import directly from any public repo
+- Automatic update checks for all sources
+- Version history per payload (up to 3 versions, auto-pruned)
+- Favorites system for payloads and profiles
+- Search & filtering (type, name, favorites)
+- Quick Start — pin profiles for instant one-tap execution
+- Device Manager — save and switch between multiple PS5 IPs
+- Config Backup / Restore / Reset with automatic pre-reset backup
+- Advanced Mode — toggleable developer tools (Port Checker, Execution Log)
+- Persistent configuration — no data loss on restarts or updates
+- Run / Stop / Pause / Resume execution
+- Real-time state via WebSocket
+- Multi-select bulk payload management
+- Clean UI optimized for Home Assistant (mobile + desktop)
 
 ---
 
@@ -284,10 +291,11 @@ goldhen.elf
 | **Connection** | Set PS5 IP address and manage saved devices |
 | **Quick Start** | Pinned profiles for one-click execution |
 | **Payloads** | Upload, manage, and send individual payloads |
-| **Auto-Load Builder** | Create and edit automation workflows visually |
+| **Auto-Load Builder** | Create and edit automation workflows visually; export as autoload.zip |
 | **Saved Profiles** | All profiles with run / edit / delete controls |
-| **Port Check** | Manually verify port availability on the PS5 |
-| **Status Log** | Live output from the current or last execution |
+| **Payload Sources** | Add GitHub repos as payload sources; import and update payloads |
+| **Port Checker** | Manually verify port availability on the PS5 (Advanced Mode) |
+| **Execution Log** | Live output from the current or last execution (Advanced Mode) |
 
 ---
 
@@ -347,5 +355,5 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <div align="center">
-  <sub>Built for Home Assistant · Tested on HA OS · v1.0.0</sub>
+  <sub>Built for Home Assistant · Tested on HA OS · v1.1.0</sub>
 </div>
