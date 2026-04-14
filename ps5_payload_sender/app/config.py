@@ -28,7 +28,7 @@ OLD_STATE_FILE   = Path("/data/state.json")
 OLD_DEVICES_FILE = Path("/data/devices.json")
 
 # ── Misc ──────────────────────────────────────────────────────────
-APP_VERSION = "1.0.0-dev"
+APP_VERSION = "1.1.0"
 MAX_PAYLOAD_VERSIONS  = 3     # versions kept per payload
 MAX_TIMING_ENTRIES    = 10    # timing samples kept per port
 MAX_LOG_ENTRIES       = 500   # log entries kept in history
