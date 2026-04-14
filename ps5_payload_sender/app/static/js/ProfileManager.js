@@ -100,9 +100,13 @@ function toggleFavorite(name) {
 
 async function runProfile(name, btn) {
   const host = getHost(); if (!host) return;
+  if (state.execState === 'running' || state.execState === 'paused') {
+    showToast('Already running'); return;
+  }
   const continueOnError = document.getElementById('continue-on-error').checked;
   // Optimistic: dim button while request fires; WS exec_state re-renders properly
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  state.execState = 'running'; // optimistic guard – prevents second click racing in
   try {
     await api('/api/autoload/run', {
       method: 'POST',
@@ -110,8 +114,12 @@ async function runProfile(name, btn) {
       body: JSON.stringify({ host, profile: name, continue_on_error: continueOnError }),
     });
   } catch (e) {
-    log('Run: ' + e.message, 'error');
-    // Restore on error (WS won't fire)
+    state.execState = 'idle'; // revert optimistic state on error
+    if (e.message.includes('409')) {
+      showToast('Already running');
+    } else {
+      log('Run: ' + e.message, 'error');
+    }
     if (btn) { btn.disabled = false; btn.textContent = '▶'; }
   }
   // Success: WS exec_state message drives the full UI update

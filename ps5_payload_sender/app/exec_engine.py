@@ -93,7 +93,7 @@ def request_resume() -> bool:
 
 async def run_autoload(req: AutoloadRequest) -> dict:
     """Execute *req.profile* step by step. Raises RuntimeError if already running."""
-    if _run_lock.locked():
+    if _run_lock.locked() or _exec_state in (ExecState.RUNNING, ExecState.PAUSED):
         raise RuntimeError("An execution is already in progress")
 
     safe = Path(req.profile).name

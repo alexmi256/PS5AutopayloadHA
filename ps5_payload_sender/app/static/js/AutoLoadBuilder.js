@@ -692,8 +692,12 @@ async function exportAutoloadZip() {
 async function builderRunDirect() {
   if (!builder.steps.length) { alert('No steps to run!'); return; }
   const host = getHost(); if (!host) return;
+  if (state.execState === 'running' || state.execState === 'paused') {
+    showToast('Already running'); return;
+  }
   clearStepRunStatus();
   _setBuilderRunning(true);
+  state.execState = 'running'; // optimistic guard – prevents second click racing in
   try {
     // Ensure each step's payload is at the correct version before sending
     await _ensureBuilderVersions();
@@ -710,8 +714,13 @@ async function builderRunDirect() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ host, profile: tmpProfile, continue_on_error: false }),
     });
-  } catch (e) { log('Run: ' + e.message, 'error'); }
-  finally {
+  } catch (e) {
+    if (e.message.includes('409')) {
+      showToast('Already running');
+    } else {
+      log('Run: ' + e.message, 'error');
+    }
+  } finally {
     _setBuilderRunning(false);
   }
 }
