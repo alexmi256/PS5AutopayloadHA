@@ -637,6 +637,60 @@ async function _ensureBuilderVersions() {
   }
 }
 
+// ── Autoload ZIP export ───────────────────────────────────────────
+async function exportAutoloadZip() {
+  if (!builder.steps.length) { alert('No steps to export!'); return; }
+
+  const lines    = [];
+  const payloads = [];
+  const warnings = [];
+
+  for (const step of builder.steps) {
+    if (step.type === 'delay') {
+      lines.push(`!${step.ms}`);
+    } else if (step.type === 'wait_port') {
+      warnings.push(`WAIT port ${step.port} (not supported by autoloader)`);
+    } else if (step.type === 'payload') {
+      if (step.filename.toLowerCase().endsWith('.lua')) {
+        warnings.push(`Lua payload ${step.filename} (skipped)`);
+      } else {
+        lines.push(step.filename);
+        payloads.push(step.filename);
+      }
+    }
+  }
+
+  if (!payloads.length) {
+    alert('No exportable payloads in the builder.\nAdd at least one ELF payload.');
+    return;
+  }
+
+  if (warnings.length) {
+    log('Export ZIP — some steps skipped:\n' + warnings.map(w => '  • ' + w).join('\n'), 'warn');
+    showToast(`${warnings.length} step${warnings.length > 1 ? 's' : ''} skipped — check log`);
+  }
+
+  try {
+    const res = await fetch(BASE + '/api/autoload/export-zip', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ autoload_txt: lines.join('\n') + '\n', payloads }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), { href: url, download: 'autoload.zip' });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    if (!warnings.length) showToast('autoload.zip downloaded');
+  } catch (e) {
+    showToast('Export failed: ' + e.message);
+    log('Export ZIP: ' + e.message, 'error');
+  }
+}
+
 async function builderRunDirect() {
   if (!builder.steps.length) { alert('No steps to run!'); return; }
   const host = getHost(); if (!host) return;

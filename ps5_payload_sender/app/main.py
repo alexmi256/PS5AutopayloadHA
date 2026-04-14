@@ -15,10 +15,12 @@ WebSocket endpoint, and static-file mount.  All heavy logic lives in focused mod
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import logging.handlers
 import time
+import zipfile
 from pathlib import Path
 
 import fnmatch
@@ -667,6 +669,32 @@ async def api_parse_profile(profile: str):
                 "interval_ms": d.interval_ms,
             })
     return {"steps": steps, "profile": p.name}
+
+
+@app.post("/api/autoload/export-zip")
+async def api_export_autoload_zip(request: Request):
+    """Build ps5_autoloader/<files> ZIP ready to extract directly onto a USB stick."""
+    from fastapi.responses import Response
+
+    data          = await request.json()
+    autoload_txt: str  = data.get("autoload_txt", "")
+    payloads: list     = data.get("payloads", [])
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("ps5_autoloader/autoload.txt", autoload_txt)
+        for fname in payloads:
+            safe = Path(fname).name   # prevent path traversal
+            path = PAYLOAD_DIR / safe
+            if path.exists() and path.is_file():
+                zf.write(str(path), f"ps5_autoloader/{safe}")
+
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="autoload.zip"'},
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -899,6 +899,15 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .btn-green:hover:not(:disabled) { background: var(--grn-dk) }
 .btn-green:disabled { opacity: .4; cursor: not-allowed }
 
+/* ── Advanced-mode-off hint (replaces Analysis section visually) ─── */
+.adv-hint {
+  font-size: .79rem; color: var(--dim); text-align: center;
+  padding: .55rem .75rem;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  background: var(--card);
+}
+body.advanced-mode .adv-hint { display: none !important }
+
 /* ── Wait-panel advanced <details> toggle ───────────────────────── */
 .wait-adv-details {
   margin-bottom: .3rem;

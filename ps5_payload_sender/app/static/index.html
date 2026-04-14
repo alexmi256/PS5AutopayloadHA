@@ -305,6 +305,11 @@
             <button id="btn-builder-save" class="btn btn-secondary" title="Save as profile">💾</button>
             <button id="btn-builder-run"  class="btn btn-primary btn-xl">▶ Run</button>
           </div>
+          <button onclick="exportAutoloadZip()" class="btn btn-sm btn-block"
+            style="margin-top:.4rem"
+            title="Export as autoload.zip — extract to USB root for PS5 autoloaders">
+            ⬇ Export autoload.zip (USB)
+          </button>
         </div>
       </div>
     </section>
@@ -330,14 +335,17 @@
       </div>
     </section>
 
-    <!-- ADVANCED / DEVELOPER TOOLS (collapsible, starts collapsed) -->
-    <section class="card collapsible" id="section-analysis">
+    <!-- Hint shown when Advanced Mode is OFF -->
+    <p class="adv-hint">Enable <strong>Advanced Mode</strong> in Connection to access analysis tools.</p>
+
+    <!-- ANALYSIS (collapsible, only visible in Advanced Mode) -->
+    <section class="card collapsible advanced-only" id="section-analysis">
       <div class="collapse-header">
-        <span class="collapse-arrow" aria-hidden="true">▶</span>
-        <h2 class="card-title">Advanced / Developer Tools</h2>
+        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <h2 class="card-title">Analysis</h2>
         <span class="collapse-summary" id="summary-analysis"></span>
       </div>
-      <div class="collapse-body collapsed">
+      <div class="collapse-body">
 
         <!-- Flow control bar -->
         <div class="flow-control-bar">
