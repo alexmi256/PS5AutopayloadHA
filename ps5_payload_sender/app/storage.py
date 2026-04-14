@@ -363,7 +363,8 @@ def restore_backup_selective(
     return {"imported": imported, "broken_profiles": broken_profiles}
 
 
-def reset_config() -> dict:    """Factory reset: back up then wipe all user data."""
+def reset_config() -> dict:
+    """Factory reset: back up then wipe all user data."""
     import time as _time
 
     # Backup first
