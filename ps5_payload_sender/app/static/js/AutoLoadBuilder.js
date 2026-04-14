@@ -204,11 +204,11 @@ function builderAddDelayStep(ms) {
 
 function builderAddWaitStep() {
   const port     = parseInt(document.getElementById('panel-wait-port').value, 10);
-  const timeout  = parseInt(document.getElementById('panel-wait-to').value, 10);
+  const toEl     = document.getElementById('panel-wait-to');
   const ivEl     = document.getElementById('panel-wait-interval');
-  const interval = ivEl ? (parseInt(ivEl.value, 10) || 500) : 500;
-  if (!port    || port < 1    || port > 65535) { alert('Invalid port!');    return; }
-  if (!timeout || timeout < 1)                 { alert('Invalid timeout!'); return; }
+  const timeout  = toEl ? (parseInt(toEl.value,  10) || 90)  : 90;
+  const interval = ivEl ? (parseInt(ivEl.value,  10) || 500) : 500;
+  if (!port || port < 1 || port > 65535) { alert('Invalid port!'); return; }
   builder.steps.push({ type: 'wait_port', port, timeout, interval_ms: Math.max(100, interval) });
   document.getElementById('panel-wait').style.display = 'none';
   builderRenderList(); scheduleSave();
@@ -494,10 +494,6 @@ function _buildWaitStep(step, idx, stepEl, mainRow, btns) {
   mainRow.appendChild(_makeStepStatusBadge(idx));
   mainRow.appendChild(btns);
 
-  // Inputs in a details row (avoids horizontal overflow on mobile)
-  const details = document.createElement('div');
-  details.className = 'step-details';
-
   function makeField(labelText, value, min, max, unit, onChange) {
     const field = document.createElement('div');
     field.className = 'step-field';
@@ -514,18 +510,26 @@ function _buildWaitStep(step, idx, stepEl, mainRow, btns) {
     return field;
   }
 
+  // Port — always visible
+  const details = document.createElement('div');
+  details.className = 'step-details';
   details.appendChild(makeField('Port', step.port, 1, 65535, '', v => {
     if (v > 0 && v <= 65535) { builder.steps[idx].port = v; scheduleSave(); }
   }));
-  details.appendChild(makeField('Timeout', step.timeout, 1, null, 's', v => {
+
+  // Timeout + Interval — advanced mode only
+  const advDetails = document.createElement('div');
+  advDetails.className = 'step-details advanced-only';
+  advDetails.appendChild(makeField('Timeout', step.timeout, 1, null, 's', v => {
     if (v > 0) { builder.steps[idx].timeout = v; scheduleSave(); }
   }));
-  details.appendChild(makeField('Interval', step.interval_ms || 500, 100, null, 'ms', v => {
+  advDetails.appendChild(makeField('Interval', step.interval_ms || 500, 100, null, 'ms', v => {
     if (v >= 100) { builder.steps[idx].interval_ms = v; scheduleSave(); }
   }));
 
   stepEl.appendChild(mainRow);
   stepEl.appendChild(details);
+  stepEl.appendChild(advDetails);
 }
 
 // ── List render ───────────────────────────────────────────────────

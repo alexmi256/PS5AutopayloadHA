@@ -21,6 +21,26 @@ async function exportConfig() {
   }
 }
 
+async function resetConfig() {
+  const ok = confirm(
+    'FACTORY RESET\n\n' +
+    'This will permanently delete:\n' +
+    '  • All sources\n' +
+    '  • All payloads\n' +
+    '  • All flows / profiles\n' +
+    '  • All settings and devices\n\n' +
+    'A backup will be saved automatically before the reset.\n\nContinue?'
+  );
+  if (!ok) return;
+  try {
+    await api('/api/config/reset', { method: 'POST' });
+    showToast('Config reset — reloading …');
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    showToast('Reset failed: ' + e.message);
+  }
+}
+
 function importConfig() {
   const input = Object.assign(document.createElement('input'), {
     type: 'file', accept: '.json',

@@ -103,6 +103,7 @@ from storage import (
     load_payload_meta,
     load_sources,
     load_ui_state,
+    reset_config,
     restore_backup,
     save_devices,
     save_payload_meta,
@@ -823,6 +824,15 @@ async def api_export_backup():
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="ps5-autopayload-backup.json"'},
     )
+
+
+@app.post("/api/config/reset")
+async def api_config_reset():
+    """Factory reset: creates a timestamped backup then wipes all user config."""
+    result = reset_config()
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, write_ha_services_yaml)
+    return result
 
 
 @app.post("/api/backup/restore")

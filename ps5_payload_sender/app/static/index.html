@@ -33,6 +33,7 @@
         <div class="header-actions">
           <button onclick="exportConfig()" class="btn btn-xs" title="Export config backup">⬇ Export</button>
           <button onclick="importConfig()" class="btn btn-xs" title="Import config backup">⬆ Import</button>
+          <button onclick="resetConfig()"  class="btn btn-xs btn-danger" title="Factory reset — deletes all config">↺ Reset</button>
         </div>
       </div>
     </div>
@@ -268,20 +269,23 @@
 
         <!-- Wait panel -->
         <div id="panel-wait" class="add-panel" style="display:none">
-          <div class="row-gap">
-            <div style="flex:1">
-              <label class="field-label" for="panel-wait-port">Port</label>
-              <input type="number" id="panel-wait-port" class="input" value="9021" min="1" max="65535" />
-            </div>
-            <div style="flex:1">
-              <label class="field-label" for="panel-wait-to">Timeout (s)</label>
-              <input type="number" id="panel-wait-to" class="input" value="60" min="1" />
-            </div>
-            <div style="flex:1">
-              <label class="field-label" for="panel-wait-interval">Interval (ms)</label>
-              <input type="number" id="panel-wait-interval" class="input" value="500" min="100" />
-            </div>
+          <div style="margin-bottom:.45rem">
+            <label class="field-label" for="panel-wait-port">Port</label>
+            <input type="number" id="panel-wait-port" class="input" value="9021" min="1" max="65535" />
           </div>
+          <details class="wait-adv-details">
+            <summary class="wait-adv-summary">Advanced</summary>
+            <div class="row-gap wait-adv-body">
+              <div style="flex:1">
+                <label class="field-label" for="panel-wait-to">Timeout (s)</label>
+                <input type="number" id="panel-wait-to" class="input" value="90" min="1" />
+              </div>
+              <div style="flex:1">
+                <label class="field-label" for="panel-wait-interval">Interval (ms)</label>
+                <input type="number" id="panel-wait-interval" class="input" value="500" min="100" />
+              </div>
+            </div>
+          </details>
           <div class="row-gap" style="margin-top:.4rem">
             <button id="btn-panel-wait-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
             <button id="btn-panel-wait-x"  class="btn btn-sm">✕</button>
@@ -326,14 +330,14 @@
       </div>
     </section>
 
-    <!-- FLOW & PORT ANALYSIS (collapsible) -->
+    <!-- ADVANCED / DEVELOPER TOOLS (collapsible, starts collapsed) -->
     <section class="card collapsible" id="section-analysis">
       <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
-        <h2 class="card-title">Flow &amp; Port Analysis</h2>
+        <span class="collapse-arrow" aria-hidden="true">▶</span>
+        <h2 class="card-title">Advanced / Developer Tools</h2>
         <span class="collapse-summary" id="summary-analysis"></span>
       </div>
-      <div class="collapse-body">
+      <div class="collapse-body collapsed">
 
         <!-- Flow control bar -->
         <div class="flow-control-bar">
@@ -344,7 +348,6 @@
             </select>
           </div>
           <div class="action-btns">
-            <button id="btn-global-run"     class="btn btn-green btn-sm" onclick="globalRun()"     disabled title="Run selected flow">▶ Run</button>
             <button id="btn-global-analyze" class="btn btn-primary btn-sm" onclick="globalAnalyze()" disabled title="Analyze selected flow">📊 Analyze</button>
             <button id="btn-global-stop"    class="btn btn-danger btn-sm" onclick="globalStop()"    style="display:none" title="Stop execution">⏹ Stop</button>
           </div>

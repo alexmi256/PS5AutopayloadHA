@@ -899,6 +899,27 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .btn-green:hover:not(:disabled) { background: var(--grn-dk) }
 .btn-green:disabled { opacity: .4; cursor: not-allowed }
 
+/* ── Wait-panel advanced <details> toggle ───────────────────────── */
+.wait-adv-details {
+  margin-bottom: .3rem;
+}
+.wait-adv-summary {
+  font-size: .77rem; color: var(--dim); cursor: pointer;
+  list-style: none; -webkit-appearance: none;
+  padding: .18rem 0; user-select: none;
+  display: flex; align-items: center; gap: .25rem;
+}
+.wait-adv-summary::-webkit-details-marker { display: none }
+.wait-adv-summary::before {
+  content: '▸';
+  font-size: .65rem;
+  display: inline-block;
+  transition: transform .15s;
+}
+.wait-adv-details[open] .wait-adv-summary::before { transform: rotate(90deg) }
+.wait-adv-summary:hover { color: var(--muted) }
+.wait-adv-body { margin-top: .35rem }
+
 /* ── Source type radio row ──────────────────────────────────────── */
 .source-type-row {
   display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .2rem;

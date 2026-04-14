@@ -64,13 +64,13 @@ function renderSourcesList() {
 
     const editBtn = document.createElement('button');
     editBtn.className = 'btn btn-sm';
-    editBtn.textContent = '✏';
+    editBtn.textContent = 'Edit';
     editBtn.title = 'Edit source';
     editBtn.addEventListener('click', () => editSource(src));
 
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-sm btn-danger';
-    delBtn.textContent = '✕';
+    delBtn.textContent = 'Delete';
     delBtn.title = 'Remove source';
     delBtn.addEventListener('click', () => deleteSource(src.repo));
 

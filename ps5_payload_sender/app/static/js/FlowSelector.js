@@ -64,7 +64,6 @@ function populateFlowSelector(profiles) {
 
 function _syncActionBar() {
   const sel     = document.getElementById('global-flow-select');
-  const btnRun  = document.getElementById('btn-global-run');
   const btnAna  = document.getElementById('btn-global-analyze');
   const btnStop = document.getElementById('btn-global-stop');
   if (!sel) return;
@@ -72,7 +71,6 @@ function _syncActionBar() {
   const hasFlow  = !!sel.value;
   const isActive = state.execState === 'running' || state.execState === 'paused';
 
-  if (btnRun)  btnRun.disabled  = !hasFlow || isActive;
   if (btnAna)  btnAna.disabled  = !hasFlow || isActive;
   if (btnStop) btnStop.style.display = isActive ? '' : 'none';
 }

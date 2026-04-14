@@ -15,6 +15,7 @@ from config import (
     ALLOWED_PAYLOAD_EXTENSIONS,
     CONFIG_BASE,
     DEVICES_FILE,
+    FLOW_RUNS_FILE,
     HIDDEN_PROFILES,
     MAX_PAYLOAD_VERSIONS,
     OLD_DEVICES_FILE,
@@ -25,6 +26,7 @@ from config import (
     PROFILES_DIR,
     SOURCES_FILE,
     STATE_FILE,
+    TIMING_FILE,
 )
 from ha_component import write_custom_component
 from payload_sender import resolve_port
@@ -221,3 +223,47 @@ def restore_backup(data: dict) -> None:
             safe = Path(name).name
             if safe.endswith(".txt"):
                 (PROFILES_DIR / safe).write_text(content, encoding="utf-8")
+
+
+def reset_config() -> dict:
+    """Factory reset: back up then wipe all user data."""
+    import time as _time
+
+    # Backup first
+    backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.json"
+    backup_file.write_text(
+        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    # Wipe payload files
+    deleted_payloads = 0
+    if PAYLOAD_DIR.exists():
+        for f in PAYLOAD_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_payloads += 1
+
+    # Wipe profile .txt files
+    deleted_profiles = 0
+    if PROFILES_DIR.exists():
+        for f in PROFILES_DIR.iterdir():
+            if f.is_file() and f.suffix.lower() == ".txt":
+                f.unlink()
+                deleted_profiles += 1
+
+    # Wipe config JSON files
+    for cfg_f in (SOURCES_FILE, STATE_FILE, DEVICES_FILE,
+                  PAYLOAD_META_FILE, TIMING_FILE, FLOW_RUNS_FILE):
+        if cfg_f.exists():
+            cfg_f.unlink()
+
+    _log.info(
+        "Config reset: %d payloads, %d profiles wiped; backup → %s",
+        deleted_payloads, deleted_profiles, backup_file.name,
+    )
+    return {
+        "success": True,
+        "backup": backup_file.name,
+        "deleted_payloads": deleted_payloads,
+        "deleted_profiles": deleted_profiles,
+    }
