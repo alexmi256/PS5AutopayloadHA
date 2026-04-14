@@ -225,8 +225,145 @@ def restore_backup(data: dict) -> None:
                 (PROFILES_DIR / safe).write_text(content, encoding="utf-8")
 
 
-def reset_config() -> dict:
-    """Factory reset: back up then wipe all user data."""
+_SETTINGS_KEYS = frozenset({
+    "ps5_ip", "advanced_mode", "favorites", "payload_favorites", "payload_filter",
+})
+_FLOW_KEYS = frozenset({"builder_steps", "builder_profile_name"})
+
+
+def restore_backup_selective(
+    data: dict,
+    sections: list,
+    mode: str = "merge",
+    conflict: str = "replace",
+) -> dict:
+    """Selective restore with merge/replace and conflict handling.
+
+    sections: any subset of ["sources", "payloads", "flows", "profiles", "settings"]
+    mode:     "merge"   – keep existing entries, add new ones
+              "replace" – overwrite the entire selected section
+    conflict: "replace" – overwrite on duplicate key / filename (default)
+              "skip"    – keep existing entry on collision (merge mode only)
+    """
+    import time as _time
+
+    # Auto-backup current config before touching anything
+    _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.json"
+    _auto.write_text(
+        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    imported: dict = {
+        "sources": 0, "payloads": 0, "flows": 0, "profiles": 0, "settings": False,
+    }
+    broken_profiles: list = []
+
+    # Collect all state changes in one pass so flows + settings don't clobber each other
+    state_changes: dict = {}
+    need_state_write = False
+
+    # ── Sources ───────────────────────────────────────────────────────
+    if "sources" in sections and "sources" in data:
+        incoming = data["sources"] or []
+        if mode == "replace":
+            save_sources(incoming)
+        else:
+            existing = load_sources()
+            seen = {s.get("url") for s in existing}
+            for s in incoming:
+                if s.get("url") not in seen:
+                    existing.append(s)
+                    seen.add(s.get("url"))
+            save_sources(existing)
+        imported["sources"] = len(incoming)
+
+    # ── Payload metadata ──────────────────────────────────────────────
+    if "payloads" in sections and "payload_meta" in data:
+        incoming = data["payload_meta"] or {}
+        if mode == "replace":
+            save_payload_meta(incoming)
+        else:
+            existing = load_payload_meta()
+            for name, meta in incoming.items():
+                if name not in existing or conflict == "replace":
+                    existing[name] = meta
+            save_payload_meta(existing)
+        imported["payloads"] = len(incoming)
+
+    # ── Auto-Load Builder flows (builder_steps inside state) ──────────
+    if "flows" in sections and "state" in data:
+        src = data["state"] or {}
+        for k in _FLOW_KEYS:
+            if k in src:
+                state_changes[k] = src[k]
+        imported["flows"] = len((data["state"] or {}).get("builder_steps") or [])
+        need_state_write = True
+
+    # ── Settings (ps5_ip / favorites / etc. + devices) ────────────────
+    if "settings" in sections:
+        if "state" in data:
+            src = data["state"] or {}
+            for k in _SETTINGS_KEYS:
+                if k in src:
+                    state_changes[k] = src[k]
+            need_state_write = True
+        if "devices" in data:
+            incoming_devs = data["devices"] or []
+            if mode == "replace":
+                save_devices(incoming_devs)
+            else:
+                existing = load_devices()
+                seen_ips = {d.get("ip") for d in existing}
+                for d in incoming_devs:
+                    if d.get("ip") not in seen_ips:
+                        existing.append(d)
+                        seen_ips.add(d.get("ip"))
+                save_devices(existing)
+        imported["settings"] = True
+
+    # Write batched state changes once
+    if need_state_write and state_changes:
+        base = load_ui_state() if mode == "merge" else {}
+        base.update(state_changes)
+        save_ui_state(base)
+
+    # ── Profiles (.txt files) ─────────────────────────────────────────
+    if "profiles" in sections and "profiles" in data:
+        PROFILES_DIR.mkdir(exist_ok=True)
+        try:
+            payload_names = {f.name for f in PAYLOAD_DIR.iterdir() if f.is_file()}
+        except Exception:
+            payload_names = set()
+
+        count = 0
+        for name, content in (data["profiles"] or {}).items():
+            safe = Path(name).name
+            if not safe.endswith(".txt"):
+                continue
+            target = PROFILES_DIR / safe
+            if target.exists() and mode == "merge" and conflict == "skip":
+                continue
+            target.write_text(content, encoding="utf-8")
+            count += 1
+            # Validate: flag profiles that reference payload files not on disk
+            for line in content.splitlines():
+                stripped = line.strip()
+                if (not stripped or stripped.startswith("#")
+                        or stripped.startswith("?") or stripped.startswith("!")):
+                    continue
+                fname = stripped.split()[0]
+                if fname and fname not in payload_names and safe not in broken_profiles:
+                    broken_profiles.append(safe)
+        imported["profiles"] = count
+
+    _log.info(
+        "Selective import: sections=%s mode=%s conflict=%s imported=%s broken=%s",
+        sections, mode, conflict, imported, broken_profiles,
+    )
+    return {"imported": imported, "broken_profiles": broken_profiles}
+
+
+def reset_config() -> dict:    """Factory reset: back up then wipe all user data."""
     import time as _time
 
     # Backup first

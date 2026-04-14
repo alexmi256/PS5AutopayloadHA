@@ -107,6 +107,7 @@ from storage import (
     load_ui_state,
     reset_config,
     restore_backup,
+    restore_backup_selective,
     save_devices,
     save_payload_meta,
     save_sources,
@@ -875,6 +876,26 @@ async def api_import_backup(request: Request):
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(executor, write_ha_services_yaml)
     return {"success": True}
+
+
+@app.post("/api/backup/restore-selective")
+async def api_import_backup_selective(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    backup = body.get("backup")
+    if not isinstance(backup, dict) or backup.get("version") != 1:
+        raise HTTPException(400, "Invalid or missing backup data")
+    sections = body.get("sections", ["sources", "payloads", "flows", "profiles", "settings"])
+    mode     = body.get("mode", "merge")
+    conflict = body.get("conflict", "replace")
+    if mode not in ("merge", "replace"):
+        raise HTTPException(400, "mode must be 'merge' or 'replace'")
+    result = restore_backup_selective(backup, sections, mode, conflict)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, write_ha_services_yaml)
+    return {"success": True, **result}
 
 
 # ---------------------------------------------------------------------------

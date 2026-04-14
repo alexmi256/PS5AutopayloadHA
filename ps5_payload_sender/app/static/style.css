@@ -939,6 +939,33 @@ body.advanced-mode .adv-hint { display: none !important }
 .wait-adv-summary:hover { color: var(--muted) }
 .wait-adv-body { margin-top: .35rem }
 
+/* ── Import config modal ─────────────────────────────────────────── */
+.import-preview {
+  font-size: .78rem; color: var(--muted);
+  background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: .45rem .65rem;
+  margin-bottom: .55rem;
+}
+.import-section-label {
+  font-size: .78rem; font-weight: 600; color: var(--muted); margin: .5rem 0 .3rem;
+}
+.import-checks { display: flex; flex-direction: column; gap: .32rem }
+.import-check-row {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .83rem; cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.import-check-row input[type="checkbox"],
+.import-check-row input[type="radio"] { cursor: pointer; flex-shrink: 0 }
+.import-mode-hint { font-size: .72rem; color: var(--dim) }
+#import-warnings { display: flex; flex-direction: column; gap: .3rem; margin-top: .55rem }
+.import-warn {
+  font-size: .76rem; padding: .35rem .6rem;
+  border-radius: var(--r-sm); border-left: 3px solid;
+}
+.import-warn-error { background: rgba(239,68,68,.1);  border-color: var(--danger);  color: var(--danger) }
+.import-warn-info  { background: rgba(234,179,8,.08); border-color: var(--lua);     color: var(--lua) }
+.import-warn-soft  { background: rgba(99,102,241,.08);border-color: var(--primary); color: var(--primary) }
+
 /* ── Source type radio row ──────────────────────────────────────── */
 .source-type-row {
   display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .2rem;
