@@ -9,6 +9,7 @@ HOST: str = os.environ.get("PS5_IP", "")
 PORT_CHECK_TIMEOUT: float = float(os.environ.get("PORT_CHECK_TIMEOUT", 10))
 PORT_CHECK_INTERVAL: float = float(int(os.environ.get("PORT_CHECK_INTERVAL", 500)) / 1000)
 SUPERVISOR_TOKEN: str = os.environ.get("SUPERVISOR_TOKEN", "")
+GITHUB_TOKEN: str = os.environ.get("GITHUB_TOKEN", "")
 
 # ── Paths ─────────────────────────────────────────────────────────
 APP_DIR    = Path("/app")

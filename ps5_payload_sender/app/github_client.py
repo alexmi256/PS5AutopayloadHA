@@ -19,10 +19,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "User-Agent": "PS5AutopayloadHA/1.0",
-    "Accept": "application/vnd.github.v3+json",
-}
+
+def _build_headers() -> dict:
+    from config import GITHUB_TOKEN
+    h = {
+        "User-Agent": "PS5AutopayloadHA/1.0",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    if GITHUB_TOKEN:
+        h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return h
+
+_HEADERS = _build_headers()
 _PAYLOAD_EXTENSIONS = {".elf", ".lua"}
 
 # ── In-memory tree cache ──────────────────────────────────────────
@@ -32,8 +40,15 @@ _CACHE_TTL = 300  # seconds
 
 def _gh_get(url: str, timeout: int = 15) -> Any:
     req = urllib.request.Request(url, headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            raise RuntimeError(
+                "GitHub API rate limit exceeded — add a GitHub token in add-on options to raise the limit."
+            ) from e
+        raise
 
 
 # ── Repo file scanning ────────────────────────────────────────────
