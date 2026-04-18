@@ -114,6 +114,7 @@ from storage import (
     save_sources,
     save_ui_state,
     setup_storage,
+    sort_versions,
     trim_versions,
 )
 from websocket_manager import manager
@@ -495,7 +496,7 @@ async def api_import_payload(req: ImportPayloadRequest):
     meta[safe] = {
         **existing,
         "repo": req.repo, "asset": req.asset_name,
-        "version": req.version, "versions": trim_versions(merged),
+        "version": req.version, "versions": trim_versions(sort_versions(merged)),
         "display_name":         display_name,
         "payload_hash":         payload_hash,
         "release_published_at": req.release_published_at,

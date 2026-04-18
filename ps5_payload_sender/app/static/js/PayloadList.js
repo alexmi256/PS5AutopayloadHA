@@ -154,11 +154,6 @@ function buildPayloadItem(p) {
       srcBadge.title       = p.source.repo;
       rowSrc.appendChild(srcBadge);
 
-      const verLabel = document.createElement('span');
-      verLabel.className   = 'p-ver-label';
-      verLabel.textContent = 'Version:';
-      rowSrc.appendChild(verLabel);
-
       const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
       if (versions.length > 0) {
         const verSel = document.createElement('select');

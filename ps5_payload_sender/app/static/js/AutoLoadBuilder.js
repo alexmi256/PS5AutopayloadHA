@@ -357,7 +357,7 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   const editPanel = _buildPayloadEditPanel(step, idx);
   const editBtn   = document.createElement('button');
   editBtn.className   = 'btn btn-sm btn-edit-payload';
-  editBtn.textContent = '✏';
+  editBtn.textContent = 'Edit';
   editBtn.title       = 'Replace payload';
   editBtn.addEventListener('click', e => { e.stopPropagation(); editPanel.open(); });
 
