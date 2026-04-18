@@ -351,8 +351,8 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   fnEl.addEventListener('click', e => { e.stopPropagation(); fnEl.classList.toggle('expanded'); });
 
   const portHint = document.createElement('span');
-  portHint.className   = 'step-autoport advanced-only';
-  portHint.textContent = `:${step.portOverride || step.autoPort}`;
+  portHint.className   = 'step-autoport';
+  portHint.textContent = `→ ${step.portOverride || step.autoPort}`;
 
   const editPanel = _buildPayloadEditPanel(step, idx);
   const editBtn   = document.createElement('button');
@@ -380,15 +380,11 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
     if (p && p.source) {
       if (!step.version) step.version = p.source.version;
 
+      // Repo label — advanced mode only
       const repoEl = document.createElement('span');
-      repoEl.className   = 'step-src-repo';
+      repoEl.className   = 'step-src-repo advanced-only';
       repoEl.textContent = p.source.repo;
       srcRow.appendChild(repoEl);
-
-      const verLabel = document.createElement('span');
-      verLabel.className   = 'step-ver-label';
-      verLabel.textContent = 'Version:';
-      srcRow.appendChild(verLabel);
 
       const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
       const curVer   = step.version || p.source.version;
@@ -417,7 +413,7 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
         verSel.className = 'step-ver-inline';
         verSel.disabled  = true;
         const opt = document.createElement('option');
-        opt.textContent = curVer || 'No versions available';
+        opt.textContent = curVer || 'No versions';
         if (curVer) opt.value = curVer;
         opt.selected = true;
         verSel.appendChild(opt);
@@ -427,7 +423,7 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
       // Local payload — no source control
       const localEl = document.createElement('span');
       localEl.className   = 'step-local-file';
-      localEl.textContent = 'Local file · No version control';
+      localEl.textContent = 'Local file';
       srcRow.appendChild(localEl);
     }
 
@@ -450,7 +446,7 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   portInp.addEventListener('input', e => {
     const v = parseInt(e.target.value, 10);
     builder.steps[idx].portOverride = (v > 0 && v <= 65535) ? v : null;
-    portHint.textContent = `:${builder.steps[idx].portOverride || step.autoPort}`;
+    portHint.textContent = `→ ${builder.steps[idx].portOverride || step.autoPort}`;
     scheduleSave();
   });
   portField.appendChild(portLabel); portField.appendChild(portInp);

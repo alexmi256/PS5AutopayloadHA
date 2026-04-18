@@ -123,32 +123,36 @@ def invalidate_cache(owner: str, repo: str) -> None:
     _tree_cache.pop(f"{owner}/{repo}", None)
 
 
-# ── Release assets (ZIP strictly excluded) ────────────────────────
+# ── Release assets ────────────────────────────────────────────────
 
 def get_releases(owner: str, repo: str) -> List[Dict[str, Any]]:
     """
-    Return all .elf / .lua release assets.  ZIP assets are silently ignored.
-    Each entry: { tag, asset_name, download_url, size, ext, is_zip:False,
-                  source_type:"release" }
+    Return .elf/.lua and .zip release assets for the last 3 releases.
+    ZIP assets have is_zip=True; download_payload() handles extraction.
+    Includes published_at and asset_updated_at for smart update detection.
     """
-    url = f"{GITHUB_API}/repos/{owner}/{repo}/releases?per_page=100"
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/releases?per_page=3"
     releases = _gh_get(url)
 
     result: List[Dict[str, Any]] = []
-    for rel in releases:
-        tag = rel.get("tag_name", "")
+    for rel in releases[:3]:
+        tag          = rel.get("tag_name", "")
+        published_at = rel.get("published_at", "")
         for asset in rel.get("assets", []):
-            ext = Path(asset["name"]).suffix.lower()
-            if ext not in _PAYLOAD_EXTENSIONS:
-                continue          # ZIP and everything else silently skipped
+            ext    = Path(asset["name"]).suffix.lower()
+            is_zip = ext == ".zip"
+            if ext not in _PAYLOAD_EXTENSIONS and not is_zip:
+                continue
             result.append({
-                "tag":          tag,
-                "asset_name":   asset["name"],
-                "download_url": asset["browser_download_url"],
-                "size":         asset.get("size", 0),
-                "ext":          ext,
-                "is_zip":       False,
-                "source_type":  "release",
+                "tag":              tag,
+                "asset_name":       asset["name"],
+                "download_url":     asset["browser_download_url"],
+                "size":             asset.get("size", 0),
+                "ext":              ext,
+                "is_zip":           is_zip,
+                "source_type":      "release",
+                "published_at":     published_at,
+                "asset_updated_at": asset.get("updated_at", ""),
             })
     return result
 

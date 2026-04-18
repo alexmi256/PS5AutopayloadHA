@@ -651,7 +651,7 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .step-ver-inline {
   font-size:.72rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
   border:1px solid var(--border); border-radius:.2rem;
-  background:var(--input-bg); color:var(--fg); max-width:130px;
+  background:var(--input-bg); color:var(--text); max-width:130px;
 }
 .step-local-file { color:var(--dim); font-style:italic; flex-shrink:0 }
 
@@ -660,7 +660,7 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .p-ver-select {
   font-size:.72rem; padding:.08rem .3rem; height:auto;
   border:1px solid var(--border); border-radius:.2rem;
-  background:var(--input-bg); color:var(--fg); max-width:140px; flex-shrink:0;
+  background:var(--input-bg); color:var(--text); max-width:140px; flex-shrink:0;
 }
 /* Local file badge (no source control) */
 .p-local-file { font-size:.72rem; color:var(--dim); font-style:italic; flex-shrink:0 }
@@ -696,6 +696,10 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 
 /* ---- Mobile scaling fixes ---- */
 @media (max-width: 480px) {
+  .header { padding: .35rem .7rem }
+  .header-adv-label { display: none }
+  .header-actions { gap: .22rem }
+
   .main { padding: .65rem }
   .card { padding: .75rem .85rem }
 

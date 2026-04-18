@@ -47,6 +47,8 @@ class ImportPayloadRequest(BaseModel):
     download_url: str
     version: str
     all_versions: List[Dict[str, str]] = []   # [{tag, download_url}, ...]
+    release_published_at: str = ""
+    asset_updated_at: str = ""
 
 
 class SwitchVersionRequest(BaseModel):

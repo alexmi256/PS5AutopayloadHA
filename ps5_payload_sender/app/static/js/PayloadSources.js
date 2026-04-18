@@ -322,12 +322,14 @@ function _renderDetectedPayloads(repo, assets) {
 
     const row = document.createElement('div');
     row.className = 'detected-row';
-    row.dataset.repo        = repo;
-    row.dataset.assetName   = assetName;
-    row.dataset.downloadUrl = latest.download_url;
-    row.dataset.version     = latest.tag;
-    row.dataset.path        = latest.path || '';
-    row.dataset.allVersions = JSON.stringify(
+    row.dataset.repo           = repo;
+    row.dataset.assetName      = assetName;
+    row.dataset.downloadUrl    = latest.download_url;
+    row.dataset.version        = latest.tag;
+    row.dataset.path           = latest.path || '';
+    row.dataset.publishedAt    = latest.published_at    || '';
+    row.dataset.assetUpdatedAt = latest.asset_updated_at || '';
+    row.dataset.allVersions    = JSON.stringify(
       versions.map(v => ({ tag: v.tag, download_url: v.download_url, path: v.path || '' }))
     );
 
@@ -411,11 +413,13 @@ async function importSelected() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo:         row.dataset.repo,
-          asset_name:   row.dataset.assetName,
-          download_url: row.dataset.downloadUrl,
-          version:      row.dataset.version,
-          all_versions: allVersions,
+          repo:                 row.dataset.repo,
+          asset_name:           row.dataset.assetName,
+          download_url:         row.dataset.downloadUrl,
+          version:              row.dataset.version,
+          all_versions:         allVersions,
+          release_published_at: row.dataset.publishedAt    || '',
+          asset_updated_at:     row.dataset.assetUpdatedAt || '',
         }),
       });
       imported++;
@@ -557,12 +561,14 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
       const ext = asset.name.includes('.') ? asset.name.slice(asset.name.lastIndexOf('.')).toLowerCase() : '';
       const row = document.createElement('div');
       row.className = 'detected-row';
-      row.dataset.repo        = repo;
-      row.dataset.assetName   = asset.name;
-      row.dataset.downloadUrl = asset.latest.download_url;
-      row.dataset.version     = asset.latest.tag;
-      row.dataset.path        = asset.latest.path || '';
-      row.dataset.allVersions = JSON.stringify(
+      row.dataset.repo           = repo;
+      row.dataset.assetName      = asset.name;
+      row.dataset.downloadUrl    = asset.latest.download_url;
+      row.dataset.version        = asset.latest.tag;
+      row.dataset.path           = asset.latest.path || '';
+      row.dataset.publishedAt    = asset.latest.published_at    || '';
+      row.dataset.assetUpdatedAt = asset.latest.asset_updated_at || '';
+      row.dataset.allVersions    = JSON.stringify(
         asset.versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
       );
 
@@ -625,11 +631,13 @@ async function _importFromPanel(list, btn, panel) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo:         row.dataset.repo,
-          asset_name:   row.dataset.assetName,
-          download_url: row.dataset.downloadUrl,
-          version:      row.dataset.version,
-          all_versions: allVersions,
+          repo:                 row.dataset.repo,
+          asset_name:           row.dataset.assetName,
+          download_url:         row.dataset.downloadUrl,
+          version:              row.dataset.version,
+          all_versions:         allVersions,
+          release_published_at: row.dataset.publishedAt    || '',
+          asset_updated_at:     row.dataset.assetUpdatedAt || '',
         }),
       });
       imported++;
