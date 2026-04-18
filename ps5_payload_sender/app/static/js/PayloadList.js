@@ -150,7 +150,7 @@ function buildPayloadItem(p) {
       // GitHub-sourced payload
       const srcBadge = document.createElement('span');
       srcBadge.className   = 'source-badge';
-      srcBadge.textContent = '⎔ ' + p.source.repo;
+      srcBadge.textContent = '⎔ ' + (p.source.display_name || p.source.repo);
       srcBadge.title       = p.source.repo;
       rowSrc.appendChild(srcBadge);
 

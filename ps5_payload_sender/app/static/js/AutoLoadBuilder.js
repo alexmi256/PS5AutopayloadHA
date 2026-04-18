@@ -340,6 +340,7 @@ function _buildPayloadEditPanel(step, idx) {
 // ── WorkflowStep renderers ────────────────────────────────────────
 function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   const isLua = step.filename.toLowerCase().endsWith('.lua');
+
   const badge = document.createElement('span');
   badge.className   = `payload-label ${isLua ? 'lua' : 'elf'}`;
   badge.textContent = 'Payload';
@@ -348,7 +349,6 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   fnEl.className   = 'step-filename';
   fnEl.textContent = step.filename;
   fnEl.title       = step.filename;
-  fnEl.addEventListener('click', e => { e.stopPropagation(); fnEl.classList.toggle('expanded'); });
 
   const portHint = document.createElement('span');
   portHint.className   = 'step-autoport';
@@ -361,78 +361,79 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   editBtn.title       = 'Replace payload';
   editBtn.addEventListener('click', e => { e.stopPropagation(); editPanel.open(); });
 
+  // Row 1: drag + num + badge + run-status + spacer + edit + btns
   mainRow.appendChild(_builderMakeDragHandle(stepEl));
   mainRow.appendChild(_makeStepNum(idx));
   mainRow.appendChild(badge);
-  mainRow.appendChild(fnEl);
-  mainRow.appendChild(portHint);
   mainRow.appendChild(_makeStepStatusBadge(idx));
+  const hSpacer = document.createElement('span'); hSpacer.style.flex = '1';
+  mainRow.appendChild(hSpacer);
   mainRow.appendChild(editBtn);
   mainRow.appendChild(btns);
-
-  // Source / version row — always rendered below main row
-  const p = state.payloads.find(x => x.name === step.filename);
   stepEl.appendChild(mainRow);
-  {
-    const srcRow = document.createElement('div');
-    srcRow.className = 'step-src-row';
 
-    if (p && p.source) {
-      if (!step.version) step.version = p.source.version;
+  // Row 2: filename (full width, wraps freely)
+  const nameRow = document.createElement('div');
+  nameRow.className = 'step-name-row';
+  nameRow.appendChild(fnEl);
+  stepEl.appendChild(nameRow);
 
-      // Repo label — advanced mode only
-      const repoEl = document.createElement('span');
-      repoEl.className   = 'step-src-repo advanced-only';
-      repoEl.textContent = p.source.repo;
-      srcRow.appendChild(repoEl);
+  // Row 3: port hint + repo (adv-only) + version dropdown or local label
+  const infoRow = document.createElement('div');
+  infoRow.className = 'step-info-row';
+  infoRow.appendChild(portHint);
 
-      const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
-      const curVer   = step.version || p.source.version;
+  const p = state.payloads.find(x => x.name === step.filename);
+  if (p && p.source) {
+    if (!step.version) step.version = p.source.version;
+    const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
+    const curVer   = step.version || p.source.version;
 
-      if (versions.length >= 1) {
-        // Interactive — updates step only, does NOT touch the global file/list
-        const verSel = document.createElement('select');
-        verSel.className = 'step-ver-inline';
-        versions.forEach(v => {
-          const opt = document.createElement('option');
-          opt.value               = v.tag;
-          opt.textContent         = v.tag === p.source.latest_version ? `${v.tag} (latest)` : v.tag;
-          opt.dataset.downloadUrl = v.download_url;
-          if (v.tag === curVer) opt.selected = true;
-          verSel.appendChild(opt);
-        });
-        verSel.addEventListener('change', () => {
-          builder.steps[idx].version = verSel.value;
-          scheduleSave();
-          showToast(`Step ${idx + 1} → ${verSel.value}`);
-        });
-        srcRow.appendChild(verSel);
-      } else {
-        // No version history — disabled dropdown
-        const verSel = document.createElement('select');
-        verSel.className = 'step-ver-inline';
-        verSel.disabled  = true;
+    const repoEl = document.createElement('span');
+    repoEl.className   = 'step-src-repo advanced-only';
+    repoEl.textContent = p.source.display_name || p.source.repo;
+    repoEl.title       = p.source.repo;
+    infoRow.appendChild(repoEl);
+
+    if (versions.length >= 1) {
+      const verSel = document.createElement('select');
+      verSel.className = 'step-ver-inline';
+      versions.forEach(v => {
         const opt = document.createElement('option');
-        opt.textContent = curVer || 'No versions';
-        if (curVer) opt.value = curVer;
-        opt.selected = true;
+        opt.value               = v.tag;
+        opt.textContent         = v.tag === p.source.latest_version ? `${v.tag} (latest)` : v.tag;
+        opt.dataset.downloadUrl = v.download_url;
+        if (v.tag === curVer) opt.selected = true;
         verSel.appendChild(opt);
-        srcRow.appendChild(verSel);
-      }
+      });
+      verSel.addEventListener('change', () => {
+        builder.steps[idx].version = verSel.value;
+        scheduleSave();
+        showToast(`Step ${idx + 1} → ${verSel.value}`);
+      });
+      infoRow.appendChild(verSel);
     } else {
-      // Local payload — no source control
-      const localEl = document.createElement('span');
-      localEl.className   = 'step-local-file';
-      localEl.textContent = 'Local file';
-      srcRow.appendChild(localEl);
+      const verSel = document.createElement('select');
+      verSel.className = 'step-ver-inline';
+      verSel.disabled  = true;
+      const opt = document.createElement('option');
+      opt.textContent = curVer || 'No versions';
+      if (curVer) opt.value = curVer;
+      opt.selected = true;
+      verSel.appendChild(opt);
+      infoRow.appendChild(verSel);
     }
-
-    stepEl.appendChild(srcRow);
+  } else {
+    const localEl = document.createElement('span');
+    localEl.className   = 'step-local-file';
+    localEl.textContent = 'Local file';
+    infoRow.appendChild(localEl);
   }
+  stepEl.appendChild(infoRow);
 
   stepEl.appendChild(editPanel);
 
-  // Port details row (advanced only)
+  // Port override input (advanced only)
   const details   = document.createElement('div');
   details.className = 'step-details advanced-only';
   const portField = document.createElement('div');

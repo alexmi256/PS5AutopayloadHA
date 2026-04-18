@@ -399,6 +399,7 @@ async def api_add_source(req: SourceAddRequest):
             meta[aname] = {
                 "repo": slug, "asset": aname,
                 "version": versions[0]["tag"], "versions": versions,
+                "display_name": req.display_name.strip(),
             }
             auto_linked.append(aname)
     if auto_linked:
@@ -411,6 +412,7 @@ async def api_add_source(req: SourceAddRequest):
             "filter": req.filter.strip(),
             "source_type": req.source_type,
             "folder": req.folder.strip(),
+            "display_name": req.display_name.strip(),
         })
         save_sources(sources)
 
@@ -435,6 +437,7 @@ async def api_update_source(owner: str, repo_name: str, req: SourceUpdateRequest
             s["filter"] = req.filter.strip()
             s["source_type"] = req.source_type
             s["folder"] = req.folder.strip()
+            s["display_name"] = req.display_name.strip()
             updated = True
             break
     if not updated:
@@ -476,10 +479,24 @@ async def api_import_payload(req: ImportPayloadRequest):
     payload_hash = hashlib.sha256(data).hexdigest()
     (PAYLOAD_DIR / safe).write_bytes(data)
     meta = load_payload_meta()
-    raw_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    existing = meta.get(safe, {})
+    existing_versions = existing.get("versions", [])
+    new_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    # Union: new_versions first (fresher URLs), then existing tags not already included
+    seen_tags: set = set()
+    merged: list = []
+    for v in (new_versions + existing_versions):
+        if v["tag"] not in seen_tags:
+            merged.append(v)
+            seen_tags.add(v["tag"])
+    sources = load_sources()
+    src_entry = next((s for s in sources if s["repo"] == req.repo), {})
+    display_name = src_entry.get("display_name", "")
     meta[safe] = {
+        **existing,
         "repo": req.repo, "asset": req.asset_name,
-        "version": req.version, "versions": trim_versions(raw_versions),
+        "version": req.version, "versions": trim_versions(merged),
+        "display_name":         display_name,
         "payload_hash":         payload_hash,
         "release_published_at": req.release_published_at,
         "asset_updated_at":     req.asset_updated_at,

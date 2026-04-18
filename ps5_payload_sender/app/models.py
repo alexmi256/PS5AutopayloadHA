@@ -39,6 +39,7 @@ class SourceAddRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"   # "auto" | "releases" | "folder"
     folder: str = ""            # only used when source_type == "folder"
+    display_name: str = ""
 
 
 class ImportPayloadRequest(BaseModel):
@@ -89,3 +90,4 @@ class SourceUpdateRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"
     folder: str = ""
+    display_name: str = ""

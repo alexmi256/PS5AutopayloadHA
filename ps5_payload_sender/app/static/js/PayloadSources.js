@@ -43,8 +43,9 @@ function renderSourcesList() {
     const info = document.createElement('div');
     info.className = 'source-info';
     const nameEl = document.createElement('span');
-    nameEl.className = 'source-repo';
-    nameEl.textContent = src.repo;
+    nameEl.className   = 'source-repo';
+    nameEl.textContent = src.display_name || src.repo;
+    nameEl.title       = src.repo;
     info.appendChild(nameEl);
     if (src.filter) {
       const filterEl = document.createElement('span');
@@ -106,8 +107,9 @@ function _openSourcePanel(prefill = null) {
   _editingSourceRepo = prefill ? prefill.repo : null;
 
   // Pre-fill (edit mode) or clear (add mode)
-  document.getElementById('source-repo-input').value  = prefill?.repo    || '';
-  document.getElementById('source-filter-input').value = prefill?.filter || '';
+  document.getElementById('source-repo-input').value    = prefill?.repo         || '';
+  document.getElementById('source-display-input').value = prefill?.display_name || '';
+  document.getElementById('source-filter-input').value  = prefill?.filter       || '';
 
   // Source type radio
   const typeVal = prefill?.source_type || 'auto';
@@ -161,7 +163,8 @@ async function saveSourceConfig() {
   const sourceType = _getSourceType();
   const folder = sourceType === 'folder'
     ? (document.getElementById('source-folder-select')?.value || '') : '';
-  const filter = document.getElementById('source-filter-input').value.trim();
+  const filter      = document.getElementById('source-filter-input').value.trim();
+  const displayName = document.getElementById('source-display-input').value.trim();
 
   try {
     // Delete old + add updated entry
@@ -173,7 +176,7 @@ async function saveSourceConfig() {
     await api(`/api/sources/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filter, source_type: sourceType, folder }),
+      body: JSON.stringify({ filter, source_type: sourceType, folder, display_name: displayName }),
     });
     statusEl.textContent = 'Source updated.'; statusEl.className = 'source-status ok';
     _editingSourceRepo = null;
@@ -274,9 +277,10 @@ async function addSource() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         repo,
-        filter:      filterInput.value.trim(),
-        source_type: sourceType,
+        filter:       filterInput.value.trim(),
+        source_type:  sourceType,
         folder,
+        display_name: document.getElementById('source-display-input').value.trim(),
       }),
     });
     const linked = data.auto_linked || [];
@@ -292,6 +296,7 @@ async function addSource() {
     _editingSourceRepo = null;
     repoInput.value   = '';
     filterInput.value = '';
+    document.getElementById('source-display-input').value = '';
   } catch (e) {
     const txt = e.message.includes('404')
       ? 'No .elf/.lua payload files found. ZIP-only releases are not supported.'
