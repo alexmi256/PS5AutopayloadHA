@@ -138,6 +138,7 @@ def get_releases(owner: str, repo: str) -> List[Dict[str, Any]]:
     for rel in releases[:3]:
         tag          = rel.get("tag_name", "")
         published_at = rel.get("published_at", "")
+        release_id   = rel.get("id", 0)
         for asset in rel.get("assets", []):
             ext    = Path(asset["name"]).suffix.lower()
             is_zip = ext == ".zip"
@@ -148,6 +149,7 @@ def get_releases(owner: str, repo: str) -> List[Dict[str, Any]]:
                 "asset_name":       asset["name"],
                 "download_url":     asset["browser_download_url"],
                 "size":             asset.get("size", 0),
+                "release_id":       release_id,
                 "ext":              ext,
                 "is_zip":           is_zip,
                 "source_type":      "release",
