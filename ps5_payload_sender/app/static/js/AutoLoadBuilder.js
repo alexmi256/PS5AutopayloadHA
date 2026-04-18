@@ -361,9 +361,10 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   editBtn.title       = 'Replace payload';
   editBtn.addEventListener('click', e => { e.stopPropagation(); editPanel.open(); });
 
-  // Row 1 (main): drag + num + run-status + spacer + edit + actions
+  // Row 1: drag + num + badge + run-status + spacer + edit + btns
   mainRow.appendChild(_builderMakeDragHandle(stepEl));
   mainRow.appendChild(_makeStepNum(idx));
+  mainRow.appendChild(badge);
   mainRow.appendChild(_makeStepStatusBadge(idx));
   const hSpacer = document.createElement('span'); hSpacer.style.flex = '1';
   mainRow.appendChild(hSpacer);
@@ -371,14 +372,13 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
   mainRow.appendChild(btns);
   stepEl.appendChild(mainRow);
 
-  // Row 2 (name): badge + filename (full width, wraps if needed)
+  // Row 2: filename (full width, wraps freely)
   const nameRow = document.createElement('div');
   nameRow.className = 'step-name-row';
-  nameRow.appendChild(badge);
   nameRow.appendChild(fnEl);
   stepEl.appendChild(nameRow);
 
-  // Row 3 (info): port + version/local
+  // Row 3: port hint + repo (adv-only) + version dropdown or local label
   const infoRow = document.createElement('div');
   infoRow.className = 'step-info-row';
   infoRow.appendChild(portHint);
@@ -389,10 +389,10 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
     const versions = Array.isArray(p.source.versions) ? p.source.versions : [];
     const curVer   = step.version || p.source.version;
 
-    // Repo label — advanced only
     const repoEl = document.createElement('span');
     repoEl.className   = 'step-src-repo advanced-only';
-    repoEl.textContent = p.source.repo;
+    repoEl.textContent = p.source.display_name || p.source.repo;
+    repoEl.title       = p.source.repo;
     infoRow.appendChild(repoEl);
 
     if (versions.length >= 1) {
@@ -433,7 +433,7 @@ function _buildPayloadStep(step, idx, stepEl, mainRow, btns) {
 
   stepEl.appendChild(editPanel);
 
-  // Port override (advanced only)
+  // Port override input (advanced only)
   const details   = document.createElement('div');
   details.className = 'step-details advanced-only';
   const portField = document.createElement('div');
