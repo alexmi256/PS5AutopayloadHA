@@ -338,32 +338,41 @@ function _renderDetectedPayloads(repo, assets) {
     cb.addEventListener('change', _updateDetectedSelectionUI);
 
     const badge = document.createElement('span');
-    badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
-    badge.textContent = ext.replace('.', '').toUpperCase();
+    badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : ext === '.zip' ? 'badge-zip' : 'badge-elf'}`;
+    badge.textContent = ext.replace('.', '').toUpperCase() || 'FILE';
 
-    const nameWrap = document.createElement('span');
-    nameWrap.className = 'detected-name-wrap';
-
+    // Top row: checkbox + badge + filename
+    const rowTop = document.createElement('div');
+    rowTop.className = 'detected-row-top';
     const nameEl = document.createElement('span');
-    nameEl.className  = 'detected-name';
+    nameEl.className   = 'detected-name';
     nameEl.textContent = assetName;
-    nameWrap.appendChild(nameEl);
+    rowTop.appendChild(cb);
+    rowTop.appendChild(badge);
+    rowTop.appendChild(nameEl);
+    row.appendChild(rowTop);
 
-    if (latest.path && latest.path !== assetName) {
-      const pathEl = document.createElement('span');
-      pathEl.className  = 'detected-path';
-      pathEl.textContent = latest.path;
-      nameWrap.appendChild(pathEl);
+    // Sub row: version + path (if present)
+    const hasVer  = latest.tag && latest.tag !== 'latest';
+    const hasPath = latest.path && latest.path !== assetName;
+    if (hasVer || hasPath) {
+      const rowSub = document.createElement('div');
+      rowSub.className = 'detected-row-sub';
+      if (hasVer) {
+        const verEl = document.createElement('span');
+        verEl.className   = 'detected-ver';
+        verEl.textContent = latest.tag;
+        rowSub.appendChild(verEl);
+      }
+      if (hasPath) {
+        const pathEl = document.createElement('span');
+        pathEl.className   = 'detected-path';
+        pathEl.textContent = latest.path;
+        rowSub.appendChild(pathEl);
+      }
+      row.appendChild(rowSub);
     }
 
-    const verEl = document.createElement('span');
-    verEl.className   = 'detected-ver';
-    verEl.textContent = latest.tag !== 'latest' ? latest.tag : '';
-
-    row.appendChild(cb);
-    row.appendChild(badge);
-    row.appendChild(nameWrap);
-    row.appendChild(verEl);
     listEl.appendChild(row);
   });
 
@@ -577,28 +586,36 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
       cb.addEventListener('change', updatePanelCount);
 
       const badge = document.createElement('span');
-      badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+      badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : ext === '.zip' ? 'badge-zip' : 'badge-elf'}`;
       badge.textContent = ext.replace('.', '').toUpperCase() || 'FILE';
 
-      const nameWrap = document.createElement('span');
-      nameWrap.className = 'detected-name-wrap';
-
+      // Top row: checkbox + badge + filename
+      const rowTop = document.createElement('div');
+      rowTop.className = 'detected-row-top';
       const nameEl = document.createElement('span');
       nameEl.className = 'detected-name'; nameEl.textContent = asset.name;
-      nameWrap.appendChild(nameEl);
+      rowTop.appendChild(cb); rowTop.appendChild(badge); rowTop.appendChild(nameEl);
+      row.appendChild(rowTop);
 
-      if (asset.latest.path && asset.latest.path !== asset.name) {
-        const pathEl = document.createElement('span');
-        pathEl.className = 'detected-path'; pathEl.textContent = asset.latest.path;
-        nameWrap.appendChild(pathEl);
+      // Sub row: version + path
+      const hasVer  = asset.latest.tag && asset.latest.tag !== 'latest';
+      const hasPath = asset.latest.path && asset.latest.path !== asset.name;
+      if (hasVer || hasPath) {
+        const rowSub = document.createElement('div');
+        rowSub.className = 'detected-row-sub';
+        if (hasVer) {
+          const verEl = document.createElement('span');
+          verEl.className = 'detected-ver'; verEl.textContent = asset.latest.tag;
+          rowSub.appendChild(verEl);
+        }
+        if (hasPath) {
+          const pathEl = document.createElement('span');
+          pathEl.className = 'detected-path'; pathEl.textContent = asset.latest.path;
+          rowSub.appendChild(pathEl);
+        }
+        row.appendChild(rowSub);
       }
 
-      const verEl = document.createElement('span');
-      verEl.className = 'detected-ver';
-      verEl.textContent = asset.latest.tag !== 'latest' ? asset.latest.tag : '';
-
-      row.appendChild(cb); row.appendChild(badge);
-      row.appendChild(nameWrap); row.appendChild(verEl);
       list.appendChild(row);
     });
 
