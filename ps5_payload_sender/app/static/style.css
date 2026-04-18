@@ -318,7 +318,7 @@ body {
   white-space:normal; overflow:visible; text-overflow:unset;
   overflow-wrap:anywhere; line-height:1.5;
 }
-.step-autoport { font-size:.72rem; color:var(--dim); flex-shrink:0 }
+.step-autoport { font-size:.82rem; color:var(--dim); flex-shrink:0 }
 .step-btns { display:flex; gap:.2rem; flex-shrink:0 }
 
 /* ---- Inline payload edit ---- */
@@ -640,16 +640,20 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 }
 .source-update-btn:hover { background:var(--green); color:#fff }
 
-/* Inline source/version row inside builder payload steps */
-.step-src-row {
+/* Inline filename + source/version rows inside builder payload steps */
+.step-name-row {
+  padding:.1rem .5rem .1rem 1.55rem; font-size:.87rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.step-info-row {
   display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
   padding:.18rem .5rem .18rem 1.55rem; margin-top:.05rem;
-  border-top:1px solid var(--border); font-size:.72rem;
+  border-top:1px solid var(--border); font-size:.82rem;
 }
 .step-src-repo  { color:var(--dim); flex-shrink:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
 .step-ver-label { color:var(--dim); flex-shrink:0 }
 .step-ver-inline {
-  font-size:.72rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
+  font-size:.82rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
   border:1px solid var(--border); border-radius:.2rem;
   background:var(--input-bg); color:var(--text); max-width:130px;
 }
