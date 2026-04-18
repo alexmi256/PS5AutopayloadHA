@@ -334,6 +334,8 @@ function _renderDetectedPayloads(repo, assets) {
     row.dataset.path           = latest.path || '';
     row.dataset.publishedAt    = latest.published_at    || '';
     row.dataset.assetUpdatedAt = latest.asset_updated_at || '';
+    row.dataset.assetSize      = String(latest.size       || 0);
+    row.dataset.releaseId      = String(latest.release_id || 0);
     row.dataset.allVersions    = JSON.stringify(
       versions.map(v => ({ tag: v.tag, download_url: v.download_url, path: v.path || '' }))
     );
@@ -425,6 +427,8 @@ async function importSelected() {
           all_versions:         allVersions,
           release_published_at: row.dataset.publishedAt    || '',
           asset_updated_at:     row.dataset.assetUpdatedAt || '',
+          asset_size:           parseInt(row.dataset.assetSize)  || 0,
+          release_id:           parseInt(row.dataset.releaseId)  || 0,
         }),
       });
       imported++;
@@ -643,6 +647,8 @@ async function _importFromPanel(list, btn, panel) {
           all_versions:         allVersions,
           release_published_at: row.dataset.publishedAt    || '',
           asset_updated_at:     row.dataset.assetUpdatedAt || '',
+          asset_size:           parseInt(row.dataset.assetSize)  || 0,
+          release_id:           parseInt(row.dataset.releaseId)  || 0,
         }),
       });
       imported++;

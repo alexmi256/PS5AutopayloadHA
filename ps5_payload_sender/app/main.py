@@ -500,6 +500,8 @@ async def api_import_payload(req: ImportPayloadRequest):
         "payload_hash":         payload_hash,
         "release_published_at": req.release_published_at,
         "asset_updated_at":     req.asset_updated_at,
+        "asset_size":           req.asset_size,
+        "release_id":           req.release_id,
     }
     save_payload_meta(meta)
     await manager.status(f"'{safe}' imported from {req.repo} {req.version}", level="success")
@@ -583,17 +585,22 @@ async def api_check_updates():
                 if not latest:
                     continue
                 update_detected = False
-                # Priority 1: tag/version difference
                 if latest["tag"] != current:
+                    # Version tag changed — clear update
                     update_detected = True
-                # Priority 2: same tag but release was re-published
-                elif (latest.get("published_at") and m.get("release_published_at")
-                      and latest["published_at"] > m["release_published_at"]):
-                    update_detected = True
-                # Priority 3: same tag+date but asset bytes silently replaced
-                elif (latest.get("asset_updated_at") and m.get("asset_updated_at")
-                      and latest["asset_updated_at"] > m["asset_updated_at"]):
-                    update_detected = True
+                elif (m.get("release_id") and latest.get("release_id")
+                      and latest["release_id"] == m["release_id"]):
+                    # Exact same release ID: binary is identical — Latest
+                    update_detected = False
+                elif m.get("asset_size") and latest.get("size"):
+                    # Size available: different size = silent content replacement
+                    if latest["size"] != m["asset_size"]:
+                        update_detected = True
+                else:
+                    # Legacy fallback: no size/release_id stored
+                    if (latest.get("asset_updated_at") and m.get("asset_updated_at")
+                          and latest["asset_updated_at"] > m["asset_updated_at"]):
+                        update_detected = True
                 if update_detected:
                     updates.append({
                         "filename": fname, "current_version": current,
