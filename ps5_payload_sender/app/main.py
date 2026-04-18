@@ -15,6 +15,7 @@ WebSocket endpoint, and static-file mount.  All heavy logic lives in focused mod
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import logging
@@ -472,12 +473,16 @@ async def api_import_payload(req: ImportPayloadRequest):
     safe = Path(actual_name).name
     if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
         raise HTTPException(400, "Only .elf and .lua files allowed")
+    payload_hash = hashlib.sha256(data).hexdigest()
     (PAYLOAD_DIR / safe).write_bytes(data)
     meta = load_payload_meta()
     raw_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
     meta[safe] = {
         "repo": req.repo, "asset": req.asset_name,
         "version": req.version, "versions": trim_versions(raw_versions),
+        "payload_hash":         payload_hash,
+        "release_published_at": req.release_published_at,
+        "asset_updated_at":     req.asset_updated_at,
     }
     save_payload_meta(meta)
     await manager.status(f"'{safe}' imported from {req.repo} {req.version}", level="success")
@@ -554,11 +559,25 @@ async def api_check_updates():
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
             latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
             for fname in filenames:
-                m = meta.get(fname, {})
+                m          = meta.get(fname, {})
                 current    = m.get("version", "")
                 asset_name = m.get("asset", fname)
                 latest     = latest_per_asset.get(asset_name)
-                if latest and latest["tag"] != current:
+                if not latest:
+                    continue
+                update_detected = False
+                # Priority 1: tag/version difference
+                if latest["tag"] != current:
+                    update_detected = True
+                # Priority 2: same tag but release was re-published
+                elif (latest.get("published_at") and m.get("release_published_at")
+                      and latest["published_at"] > m["release_published_at"]):
+                    update_detected = True
+                # Priority 3: same tag+date but asset bytes silently replaced
+                elif (latest.get("asset_updated_at") and m.get("asset_updated_at")
+                      and latest["asset_updated_at"] > m["asset_updated_at"]):
+                    update_detected = True
+                if update_detected:
                     updates.append({
                         "filename": fname, "current_version": current,
                         "latest_version": latest["tag"],
