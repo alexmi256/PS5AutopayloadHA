@@ -377,15 +377,27 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
     });
 
     if (builderMatches.length) {
-      const label = document.createElement('label');
-      label.className = 'modal-step-row';
-      builderCb = document.createElement('input');
+      const flowName  = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
+      const fromVers  = [...new Set(builderMatches.map(m => m.step.version || '(unset)'))];
+      const label     = document.createElement('label');
+      label.className = 'modal-step-row modal-flow-group';
+      builderCb       = document.createElement('input');
       builderCb.type    = 'checkbox';
       builderCb.checked = false;
-      const text = document.createElement('span');
-      text.textContent = `Builder — also update ${builderMatches.length} step version${builderMatches.length > 1 ? 's' : ''}`;
+      const wrap      = document.createElement('span');
+      wrap.className  = 'modal-flow-label';
+      const nameSpan  = document.createElement('span');
+      nameSpan.className   = 'modal-flow-name';
+      nameSpan.textContent = builderMatches.length > 1
+        ? `${flowName}  (${builderMatches.length} usages)`
+        : flowName;
+      const verSpan   = document.createElement('span');
+      verSpan.className   = 'modal-flow-ver';
+      verSpan.textContent = `${fromVers.join(', ')}  →  ${updateInfo.latest_version}`;
+      wrap.appendChild(nameSpan);
+      wrap.appendChild(verSpan);
       label.appendChild(builderCb);
-      label.appendChild(text);
+      label.appendChild(wrap);
       flowList.appendChild(label);
     }
     box.appendChild(flowList);
@@ -443,6 +455,15 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
 
 function _openUpdateUsagesDialog(p, stepMatches) {
   const targetVer = p.source.version;
+  const flowName  = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
+
+  // Group steps by their current version to deduplicate rows
+  const byVer = {};
+  stepMatches.forEach(({ step, idx }) => {
+    const v = step.version || '(unset)';
+    if (!byVer[v]) byVer[v] = [];
+    byVer[v].push(idx);
+  });
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -455,26 +476,32 @@ function _openUpdateUsagesDialog(p, stepMatches) {
   title.textContent = `Update usages — ${p.name}`;
   box.appendChild(title);
 
-  const verInfo = document.createElement('div');
-  verInfo.className   = 'modal-ver-info';
-  verInfo.textContent = `Target version: ${targetVer}`;
-  box.appendChild(verInfo);
-
   const stepList = document.createElement('div');
   stepList.className = 'modal-step-list';
   const checkboxes = [];
-  stepMatches.forEach(({ step, idx }) => {
+
+  Object.entries(byVer).forEach(([fromVer, idxList]) => {
     const label = document.createElement('label');
-    label.className = 'modal-step-row';
+    label.className = 'modal-step-row modal-flow-group';
     const cb = document.createElement('input');
-    cb.type            = 'checkbox';
-    cb.checked         = true;
-    cb.dataset.stepIdx = String(idx);
+    cb.type                = 'checkbox';
+    cb.checked             = true;
+    cb.dataset.stepIdxList = JSON.stringify(idxList);
     checkboxes.push(cb);
-    const text = document.createElement('span');
-    text.textContent = `Step ${idx + 1} — currently: ${step.version || '(unset)'}`;
+    const wrap = document.createElement('span');
+    wrap.className = 'modal-flow-label';
+    const nameSpan = document.createElement('span');
+    nameSpan.className   = 'modal-flow-name';
+    nameSpan.textContent = idxList.length > 1
+      ? `${flowName}  (${idxList.length} usages)`
+      : flowName;
+    const verSpan = document.createElement('span');
+    verSpan.className   = 'modal-flow-ver';
+    verSpan.textContent = `${fromVer}  →  ${targetVer}`;
+    wrap.appendChild(nameSpan);
+    wrap.appendChild(verSpan);
     label.appendChild(cb);
-    label.appendChild(text);
+    label.appendChild(wrap);
     stepList.appendChild(label);
   });
   box.appendChild(stepList);
@@ -491,13 +518,14 @@ function _openUpdateUsagesDialog(p, stepMatches) {
   confirmBtn.className   = 'btn btn-sm btn-primary';
   confirmBtn.textContent = 'Update selected';
   confirmBtn.addEventListener('click', () => {
-    const selected = checkboxes.filter(cb => cb.checked);
-    if (!selected.length) { overlay.remove(); return; }
-    selected.forEach(cb => {
-      builder.steps[parseInt(cb.dataset.stepIdx, 10)].version = targetVer;
+    const allIdxs = [];
+    checkboxes.filter(cb => cb.checked).forEach(cb => {
+      JSON.parse(cb.dataset.stepIdxList).forEach(i => allIdxs.push(i));
     });
+    if (!allIdxs.length) { overlay.remove(); return; }
+    allIdxs.forEach(i => { builder.steps[i].version = targetVer; });
     scheduleSave();
-    const n = selected.length;
+    const n = allIdxs.length;
     showToast(`Updated ${n} step${n > 1 ? 's' : ''} to ${targetVer}`);
     overlay.remove();
     renderPayloadList();

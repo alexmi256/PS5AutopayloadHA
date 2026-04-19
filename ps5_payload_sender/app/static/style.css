@@ -1003,5 +1003,9 @@ body.advanced-mode .adv-hint { display: none !important }
   display:flex; align-items:center; gap:.5rem;
   font-size:.83rem; cursor:pointer; user-select:none;
 }
-.modal-step-row input[type=checkbox] { accent-color:var(--primary); cursor:pointer }
+.modal-step-row.modal-flow-group { align-items:flex-start }
+.modal-step-row input[type=checkbox] { accent-color:var(--primary); cursor:pointer; margin-top:.15rem }
+.modal-flow-label { display:flex; flex-direction:column; gap:.18rem }
+.modal-flow-name  { font-weight:600; font-size:.83rem }
+.modal-flow-ver   { font-size:.76rem; color:var(--muted) }
 .modal-btn-row { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.2rem }
