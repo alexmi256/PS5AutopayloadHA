@@ -90,6 +90,7 @@ from models import (
     PortCheckRequest,
     SaveProfileRequest,
     SendRequest,
+    SetDefaultVersionRequest,
     SourceAddRequest,
     SourceUpdateRequest,
     SwitchVersionRequest,
@@ -537,6 +538,18 @@ async def api_switch_version(filename: str, req: SwitchVersionRequest):
     save_payload_meta(meta)
     await manager.status(f"'{safe}' switched to {req.version}", level="success")
     return {"success": True, "filename": safe, "version": req.version, "backup_version": backup_version}
+
+
+@app.post("/api/payloads/{filename}/set-default-version")
+async def api_set_default_version(filename: str, req: SetDefaultVersionRequest):
+    """Update the default version tag in metadata without downloading the binary."""
+    meta = load_payload_meta()
+    safe = Path(filename).name
+    if safe not in meta:
+        raise HTTPException(404, "Payload not in metadata")
+    meta[safe]["version"] = req.version
+    save_payload_meta(meta)
+    return {"ok": True, "version": req.version}
 
 
 @app.post("/api/payloads/{filename}/rollback")

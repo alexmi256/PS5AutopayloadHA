@@ -169,35 +169,18 @@ function buildPayloadItem(p) {
         verSel.addEventListener('change', async () => {
           const newVer = verSel.value;
           if (newVer === p.source.version) return;
-          const opt = verSel.options[verSel.selectedIndex];
-          // Lazy usage check
-          let usedIn = [];
           try {
-            const usage = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`);
-            usedIn = usage.used_in || [];
-          } catch (_) {}
-          if (builder.steps.some(s => s.type === 'payload' && s.filename === p.name)) usedIn.push('Builder');
-          if (usedIn.length && !confirm(`'${p.name}' is used in: ${usedIn.join(', ')}.\nSwitch to ${newVer}?`)) {
-            verSel.value = p.source.version; return;
-          }
-          verSel.disabled = true;
-          try {
-            await api(`/api/payloads/${encodeURIComponent(p.name)}/switch-version`, {
+            await api(`/api/payloads/${encodeURIComponent(p.name)}/set-default-version`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                repo: p.source.repo, asset_name: p.source.asset,
-                download_url: opt.dataset.downloadUrl, version: newVer,
-              }),
+              body: JSON.stringify({ version: newVer }),
             });
             p.source.version = newVer;
-            if (state.updateResults) delete state.updateResults[p.name];
-            showToast(`Switched to ${newVer}`);
-            await refreshPayloads();
+            showToast(`Default → ${newVer}`);
+            renderPayloadList();
           } catch (e) {
-            log('Switch version: ' + e.message, 'error');
+            log('Set default version: ' + e.message, 'error');
             verSel.value = p.source.version;
-            verSel.disabled = false;
           }
         });
         rowSrc.appendChild(verSel);
@@ -267,14 +250,29 @@ function buildPayloadItem(p) {
       rowSrc.appendChild(upToDate);
     }
 
-    // ── Builder usage warning ────────────────────────────────────────
-    const builderUses = builder.steps.filter(s => s.type === 'payload' && s.filename === p.name).length;
-    if (builderUses) {
-      const usedWarn = document.createElement('span');
-      usedWarn.className   = 'payload-used-warn';
-      usedWarn.textContent = `⚠ In builder`;
-      usedWarn.title       = `Used in ${builderUses} builder step${builderUses > 1 ? 's' : ''}`;
-      rowSrc.appendChild(usedWarn);
+    // ── Builder usage: "Update usages" button or simple badge ───────
+    {
+      const builderMatches = builder.steps
+        .map((s, idx) => ({ step: s, idx }))
+        .filter(({ step }) => step.type === 'payload' && step.filename === p.name);
+      const hasMultiVer = (Array.isArray(p.source && p.source.versions) ? p.source.versions : []).length > 1;
+      if (builderMatches.length && hasMultiVer) {
+        const updBtn = document.createElement('button');
+        updBtn.className   = 'btn btn-sm';
+        updBtn.textContent = 'Update usages';
+        updBtn.title       = `Update ${builderMatches.length} builder step${builderMatches.length > 1 ? 's' : ''} to a chosen version`;
+        updBtn.addEventListener('click', ev => {
+          ev.stopPropagation();
+          _openUpdateUsagesDialog(p, builderMatches);
+        });
+        rowSrc.appendChild(updBtn);
+      } else if (builderMatches.length) {
+        const usedWarn = document.createElement('span');
+        usedWarn.className   = 'payload-used-warn';
+        usedWarn.textContent = 'In builder';
+        usedWarn.title       = `Used in ${builderMatches.length} builder step${builderMatches.length > 1 ? 's' : ''}`;
+        rowSrc.appendChild(usedWarn);
+      }
     }
 
     // Rollback button if backup exists (sourced payloads only)
@@ -351,6 +349,77 @@ async function bulkDeleteSelected() {
   state.selectedPayloads = new Set();
   await refreshPayloads();
   if (deleted > 0) { log(`${deleted} payload(s) deleted`, 'success'); showToast(`${deleted} payload(s) deleted`); }
+}
+
+function _openUpdateUsagesDialog(p, stepMatches) {
+  const targetVer = p.source.version;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+
+  const title = document.createElement('div');
+  title.className   = 'modal-title';
+  title.textContent = `Update usages — ${p.name}`;
+  box.appendChild(title);
+
+  const verInfo = document.createElement('div');
+  verInfo.className   = 'modal-ver-info';
+  verInfo.textContent = `Target version: ${targetVer}`;
+  box.appendChild(verInfo);
+
+  const stepList = document.createElement('div');
+  stepList.className = 'modal-step-list';
+  const checkboxes = [];
+  stepMatches.forEach(({ step, idx }) => {
+    const label = document.createElement('label');
+    label.className = 'modal-step-row';
+    const cb = document.createElement('input');
+    cb.type            = 'checkbox';
+    cb.checked         = true;
+    cb.dataset.stepIdx = String(idx);
+    checkboxes.push(cb);
+    const text = document.createElement('span');
+    text.textContent = `Step ${idx + 1} — currently: ${step.version || '(unset)'}`;
+    label.appendChild(cb);
+    label.appendChild(text);
+    stepList.appendChild(label);
+  });
+  box.appendChild(stepList);
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'modal-btn-row';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className   = 'btn btn-sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => overlay.remove());
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className   = 'btn btn-sm btn-primary';
+  confirmBtn.textContent = 'Update selected';
+  confirmBtn.addEventListener('click', () => {
+    const selected = checkboxes.filter(cb => cb.checked);
+    if (!selected.length) { overlay.remove(); return; }
+    selected.forEach(cb => {
+      builder.steps[parseInt(cb.dataset.stepIdx, 10)].version = targetVer;
+    });
+    scheduleSave();
+    const n = selected.length;
+    showToast(`Updated ${n} step${n > 1 ? 's' : ''} to ${targetVer}`);
+    overlay.remove();
+    renderPayloadList();
+    if (typeof builderRenderList === 'function') builderRenderList();
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 async function uploadPayloads(files) {

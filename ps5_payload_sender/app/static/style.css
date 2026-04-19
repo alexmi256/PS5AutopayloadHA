@@ -983,3 +983,25 @@ body.advanced-mode .adv-hint { display: none !important }
   font-size: .85rem; cursor: pointer;
 }
 .radio-label input[type="radio"] { accent-color: var(--primary) }
+
+/* ── Update-usages modal ── */
+.modal-overlay {
+  position:fixed; inset:0; z-index:500;
+  background:rgba(0,0,0,.55); display:flex;
+  align-items:center; justify-content:center;
+}
+.modal-box {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1.2rem 1.4rem;
+  min-width:260px; max-width:420px; width:90%;
+  box-shadow:var(--shadow); display:flex; flex-direction:column; gap:.7rem;
+}
+.modal-title    { font-size:.9rem; font-weight:700 }
+.modal-ver-info { font-size:.82rem; color:var(--muted) }
+.modal-step-list { display:flex; flex-direction:column; gap:.4rem }
+.modal-step-row {
+  display:flex; align-items:center; gap:.5rem;
+  font-size:.83rem; cursor:pointer; user-select:none;
+}
+.modal-step-row input[type=checkbox] { accent-color:var(--primary); cursor:pointer }
+.modal-btn-row { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.2rem }

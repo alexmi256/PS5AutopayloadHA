@@ -61,6 +61,10 @@ class SwitchVersionRequest(BaseModel):
     version: str
 
 
+class SetDefaultVersionRequest(BaseModel):
+    version: str
+
+
 class AnalyzePortRequest(BaseModel):
     host: str
     port: int
