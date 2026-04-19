@@ -250,7 +250,7 @@ function buildPayloadItem(p) {
       rowSrc.appendChild(upToDate);
     }
 
-    // ── Builder usage: "Update usages" button or simple badge ───────
+    // ── Builder / saved-flow usage: "Update flows" button or simple badge ──
     {
       const builderMatches = builder.steps
         .map((s, idx) => ({ step: s, idx }))
@@ -259,11 +259,34 @@ function buildPayloadItem(p) {
       if (builderMatches.length && hasMultiVer) {
         const updBtn = document.createElement('button');
         updBtn.className   = 'btn btn-sm';
-        updBtn.textContent = 'Update usages';
-        updBtn.title       = `Update ${builderMatches.length} builder step${builderMatches.length > 1 ? 's' : ''} to a chosen version`;
-        updBtn.addEventListener('click', ev => {
+        updBtn.textContent = 'Update flows';
+        updBtn.title       = 'Update all flows using this payload to the selected version';
+        updBtn.addEventListener('click', async ev => {
           ev.stopPropagation();
-          _openUpdateUsagesDialog(p, builderMatches);
+          updBtn.disabled    = true;
+          updBtn.textContent = 'Loading…';
+          console.log('Scanning flows for payload:', p.name);
+          let usedInProfiles = [];
+          try {
+            const u = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`);
+            usedInProfiles = u.used_in || [];
+          } catch (_) {}
+          const flowDetails = {};
+          await Promise.all(usedInProfiles.map(async name => {
+            const fname = name.endsWith('.txt') ? name : name + '.txt';
+            try {
+              const data = await api(`/api/autoload/parse/${encodeURIComponent(fname)}`);
+              const pin  = (data.version_pins || {})[p.name] || null;
+              flowDetails[name] = { versionPin: pin };
+              console.log('Found in flow:', name, 'pin:', pin);
+            } catch (_) {}
+          }));
+          if (usedInProfiles.length + builderMatches.length <= 1) {
+            console.log('Only 1 usage found. All flows:', state.profiles);
+          }
+          updBtn.disabled    = false;
+          updBtn.textContent = 'Update flows';
+          _openUpdateUsagesDialog(p, builderMatches, usedInProfiles, flowDetails);
         });
         rowSrc.appendChild(updBtn);
       } else if (builderMatches.length) {
@@ -507,58 +530,105 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches, f
   document.body.appendChild(overlay);
 }
 
-function _openUpdateUsagesDialog(p, stepMatches) {
-  const targetVer = p.source.version;
-  const flowName  = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
-
-  // Group steps by their current version to deduplicate rows
-  const byVer = {};
-  stepMatches.forEach(({ step, idx }) => {
-    const v = step.version || '(unset)';
-    if (!byVer[v]) byVer[v] = [];
-    byVer[v].push(idx);
-  });
+function _openUpdateUsagesDialog(p, stepMatches, usedInProfiles, flowDetails) {
+  const targetVer  = p.source.version;
+  const builderName = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
+  usedInProfiles = usedInProfiles || [];
+  flowDetails    = flowDetails    || {};
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-
   const box = document.createElement('div');
   box.className = 'modal-box';
 
   const title = document.createElement('div');
   title.className   = 'modal-title';
-  title.textContent = `Update usages — ${p.name}`;
+  title.textContent = `Update flows — ${p.name}`;
   box.appendChild(title);
 
-  const stepList = document.createElement('div');
-  stepList.className = 'modal-step-list';
-  const checkboxes = [];
+  const verInfo = document.createElement('div');
+  verInfo.className   = 'modal-ver-info';
+  verInfo.textContent = `Target version: ${targetVer}`;
+  box.appendChild(verInfo);
 
-  Object.entries(byVer).forEach(([fromVer, idxList]) => {
-    const label = document.createElement('label');
-    label.className = 'modal-step-row modal-flow-group';
-    const cb = document.createElement('input');
-    cb.type                = 'checkbox';
-    cb.checked             = true;
-    cb.dataset.stepIdxList = JSON.stringify(idxList);
-    checkboxes.push(cb);
-    const wrap = document.createElement('span');
-    wrap.className = 'modal-flow-label';
-    const nameSpan = document.createElement('span');
-    nameSpan.className   = 'modal-flow-name';
-    nameSpan.textContent = idxList.length > 1
-      ? `${flowName}  (${idxList.length} usages)`
-      : flowName;
-    const verSpan = document.createElement('span');
-    verSpan.className   = 'modal-flow-ver';
-    verSpan.textContent = `${fromVer}  →  ${targetVer}`;
-    wrap.appendChild(nameSpan);
-    wrap.appendChild(verSpan);
-    label.appendChild(cb);
-    label.appendChild(wrap);
-    stepList.appendChild(label);
+  const allCbs = [];
+
+  const totalRows = usedInProfiles.length + (stepMatches.length ? 1 : 0);
+  if (totalRows > 1) {
+    const quickRow = document.createElement('div');
+    quickRow.className = 'modal-quick-row';
+    const selAll = document.createElement('button');
+    selAll.className   = 'btn-link'; selAll.textContent = 'Select all';
+    selAll.addEventListener('click', () => { allCbs.forEach(cb => { cb.disabled || (cb.checked = true); }); sync(); });
+    const deselAll = document.createElement('button');
+    deselAll.className   = 'btn-link'; deselAll.textContent = 'Deselect all';
+    deselAll.addEventListener('click', () => { allCbs.forEach(cb => { cb.disabled || (cb.checked = false); }); sync(); });
+    quickRow.appendChild(selAll);
+    quickRow.appendChild(deselAll);
+    box.appendChild(quickRow);
+  }
+
+  const flowList = document.createElement('div');
+  flowList.className = 'modal-step-list';
+
+  // Saved flows
+  usedInProfiles.forEach(name => {
+    const currentVer = (flowDetails[name] || {}).versionPin || null;
+    const upToDate   = currentVer === targetVer;
+    const label      = document.createElement('label');
+    label.className  = 'modal-step-row modal-flow-group';
+    const cb         = document.createElement('input');
+    cb.type             = 'checkbox';
+    cb.checked          = !upToDate;
+    cb.disabled         = upToDate;
+    cb.dataset.flowName = name;
+    allCbs.push(cb);
+    cb.addEventListener('change', sync);
+    const wrap     = document.createElement('span'); wrap.className = 'modal-flow-label';
+    const nameSpan = document.createElement('span'); nameSpan.className = 'modal-flow-name';
+    nameSpan.textContent = name;
+    const verSpan  = document.createElement('span'); verSpan.className = 'modal-flow-ver';
+    verSpan.textContent = upToDate
+      ? 'already up-to-date'
+      : currentVer ? `${currentVer}  →  ${targetVer}` : `→  ${targetVer}`;
+    wrap.appendChild(nameSpan); wrap.appendChild(verSpan);
+    label.appendChild(cb); label.appendChild(wrap);
+    flowList.appendChild(label);
   });
-  box.appendChild(stepList);
+
+  // Builder steps grouped by current version
+  if (stepMatches.length) {
+    const byVer = {};
+    stepMatches.forEach(({ step, idx }) => {
+      const v = step.version || '(unset)';
+      if (!byVer[v]) byVer[v] = [];
+      byVer[v].push(idx);
+    });
+    Object.entries(byVer).forEach(([fromVer, idxList]) => {
+      const upToDate = fromVer === targetVer;
+      const label    = document.createElement('label');
+      label.className = 'modal-step-row modal-flow-group';
+      const cb        = document.createElement('input');
+      cb.type                = 'checkbox';
+      cb.checked             = !upToDate;
+      cb.disabled            = upToDate;
+      cb.dataset.stepIdxList = JSON.stringify(idxList);
+      allCbs.push(cb);
+      cb.addEventListener('change', sync);
+      const wrap     = document.createElement('span'); wrap.className = 'modal-flow-label';
+      const nameSpan = document.createElement('span'); nameSpan.className = 'modal-flow-name';
+      nameSpan.textContent = idxList.length > 1
+        ? `${builderName}  (${idxList.length} usages)`
+        : builderName;
+      const verSpan  = document.createElement('span'); verSpan.className = 'modal-flow-ver';
+      verSpan.textContent = upToDate ? 'already up-to-date' : `${fromVer}  →  ${targetVer}`;
+      wrap.appendChild(nameSpan); wrap.appendChild(verSpan);
+      label.appendChild(cb); label.appendChild(wrap);
+      flowList.appendChild(label);
+    });
+  }
+
+  box.appendChild(flowList);
 
   const btnRow = document.createElement('div');
   btnRow.className = 'modal-btn-row';
@@ -571,16 +641,32 @@ function _openUpdateUsagesDialog(p, stepMatches) {
   const confirmBtn = document.createElement('button');
   confirmBtn.className   = 'btn btn-sm btn-primary';
   confirmBtn.textContent = 'Update selected';
-  confirmBtn.addEventListener('click', () => {
+
+  function sync() { confirmBtn.disabled = !allCbs.some(cb => cb.checked); }
+  sync();
+
+  confirmBtn.addEventListener('click', async () => {
+    confirmBtn.disabled    = true;
+    confirmBtn.textContent = 'Updating…';
+    // Patch saved flows
+    const savedChecked = allCbs.filter(cb => cb.checked && cb.dataset.flowName);
+    try {
+      await Promise.all(savedChecked.map(cb =>
+        api(`/api/autoload/patch-versions/${encodeURIComponent(cb.dataset.flowName + '.txt')}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: p.name, version: targetVer }),
+        })
+      ));
+    } catch (e) { log('Patch flow versions: ' + e.message, 'error'); }
+    // Update builder steps
     const allIdxs = [];
-    checkboxes.filter(cb => cb.checked).forEach(cb => {
+    allCbs.filter(cb => cb.checked && cb.dataset.stepIdxList).forEach(cb => {
       JSON.parse(cb.dataset.stepIdxList).forEach(i => allIdxs.push(i));
     });
-    if (!allIdxs.length) { overlay.remove(); return; }
     allIdxs.forEach(i => { builder.steps[i].version = targetVer; });
-    scheduleSave();
-    const n = allIdxs.length;
-    showToast(`Updated ${n} step${n > 1 ? 's' : ''} to ${targetVer}`);
+    if (allIdxs.length) scheduleSave();
+    const total = savedChecked.length + allIdxs.length;
+    showToast(`Updated ${total} usage${total !== 1 ? 's' : ''} to ${targetVer}`);
     overlay.remove();
     renderPayloadList();
     if (typeof builderRenderList === 'function') builderRenderList();

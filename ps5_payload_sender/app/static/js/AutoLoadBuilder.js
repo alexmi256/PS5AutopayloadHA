@@ -566,14 +566,23 @@ function builderDeleteStep(idx) {
 }
 
 function builderGenerate() {
-  return builder.steps.map(step => {
+  // Collect one ~version pin per payload filename (first occurrence wins)
+  const pins = [];
+  const pinned = new Set();
+  builder.steps.forEach(step => {
+    if (step.type === 'payload' && step.version && !pinned.has(step.filename)) {
+      pins.push(`# ~version ${step.filename} ${step.version}`);
+      pinned.add(step.filename);
+    }
+  });
+  const directives = builder.steps.map(step => {
     if (step.type === 'payload')
       return step.portOverride ? `${step.filename} ${step.portOverride}` : step.filename;
     if (step.type === 'delay') return `!${step.ms}`;
-    // wait_port: ?port timeout interval_ms
     const intervalMs = step.interval_ms || 500;
     return `?${step.port} ${step.timeout} ${intervalMs}`;
-  }).join('\n');
+  });
+  return [...pins, ...directives].join('\n');
 }
 
 async function builderSave() {
