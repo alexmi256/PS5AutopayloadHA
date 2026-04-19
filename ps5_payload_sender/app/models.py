@@ -97,3 +97,8 @@ class SourceUpdateRequest(BaseModel):
     source_type: str = "auto"
     folder: str = ""
     display_name: str = ""
+
+
+class PatchFlowVersionsRequest(BaseModel):
+    filename: str
+    version: str

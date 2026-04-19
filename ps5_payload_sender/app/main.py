@@ -43,7 +43,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 import payload_sender as _ps_module
-from autoload_parser import DelayDirective, SendDirective, WaitPortDirective, parse_autoload_path
+from autoload_parser import (
+    DelayDirective, SendDirective, WaitPortDirective,
+    parse_autoload_path, parse_version_pins, set_version_pin,
+)
 from config import (
     APP_VERSION,
     ALLOWED_PAYLOAD_EXTENSIONS,
@@ -88,6 +91,7 @@ from models import (
     FlowAnalyzeRequest,
     ImportPayloadRequest,
     PortCheckRequest,
+    PatchFlowVersionsRequest,
     SaveProfileRequest,
     SendRequest,
     SetDefaultVersionRequest,
@@ -693,6 +697,8 @@ async def api_parse_profile(profile: str):
     p = PROFILES_DIR / Path(profile).name
     if not p.exists():
         raise HTTPException(404, "Profile not found")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    version_pins = parse_version_pins(content)
     steps = []
     for d in parse_autoload_path(p):
         if isinstance(d, SendDirective):
@@ -701,6 +707,7 @@ async def api_parse_profile(profile: str):
                 "filename": d.filename,
                 "autoPort": resolve_port(d.filename),
                 "portOverride": d.port,
+                "version": version_pins.get(d.filename),
             })
         elif isinstance(d, DelayDirective):
             steps.append({"type": "delay", "ms": d.milliseconds})
@@ -711,7 +718,18 @@ async def api_parse_profile(profile: str):
                 "timeout": d.timeout_seconds,
                 "interval_ms": d.interval_ms,
             })
-    return {"steps": steps, "profile": p.name}
+    return {"steps": steps, "profile": p.name, "version_pins": version_pins}
+
+
+@app.post("/api/autoload/patch-versions/{profile}")
+async def api_patch_flow_versions(profile: str, req: PatchFlowVersionsRequest):
+    p = PROFILES_DIR / Path(profile).name
+    if not p.exists():
+        raise HTTPException(404, "Profile not found")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    content = set_version_pin(content, req.filename, req.version)
+    p.write_text(content, encoding="utf-8")
+    return {"ok": True}
 
 
 @app.post("/api/autoload/export-zip")

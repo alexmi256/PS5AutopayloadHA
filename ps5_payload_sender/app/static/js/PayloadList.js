@@ -224,12 +224,21 @@ function buildPayloadItem(p) {
           const u = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`);
           usedInProfiles = u.used_in || [];
         } catch (_) {}
+        // Fetch version-pin metadata for each used flow in parallel
+        const flowDetails = {};
+        await Promise.all(usedInProfiles.map(async name => {
+          const fname = name.endsWith('.txt') ? name : name + '.txt';
+          try {
+            const data = await api(`/api/autoload/parse/${encodeURIComponent(fname)}`);
+            flowDetails[name] = { versionPin: (data.version_pins || {})[p.name] || null };
+          } catch (_) {}
+        }));
         const builderMatches = builder.steps
           .map((s, idx) => ({ step: s, idx }))
           .filter(({ step }) => step.type === 'payload' && step.filename === p.name);
         updBtn.disabled    = false;
         updBtn.textContent = 'Update flows';
-        _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches);
+        _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches, flowDetails);
       });
       rowSrc.appendChild(warnEl);
       rowSrc.appendChild(updBtn);
@@ -342,7 +351,7 @@ async function bulkDeleteSelected() {
   if (deleted > 0) { log(`${deleted} payload(s) deleted`, 'success'); showToast(`${deleted} payload(s) deleted`); }
 }
 
-function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
+function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches, flowDetails) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const box = document.createElement('div');
@@ -358,48 +367,81 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
   verInfo.textContent = `New version: ${updateInfo.latest_version}`;
   box.appendChild(verInfo);
 
+  const allCbs = [];  // all checkboxes for updateConfirmBtn + select-all
   let builderCb = null;
+
   if (usedInProfiles.length || builderMatches.length) {
-    const flowsLabel = document.createElement('div');
-    flowsLabel.className   = 'modal-ver-info';
-    flowsLabel.textContent = 'Flows that will receive this update:';
-    box.appendChild(flowsLabel);
+    const totalRows = usedInProfiles.length + (builderMatches.length ? 1 : 0);
+    if (totalRows > 1) {
+      const quickRow = document.createElement('div');
+      quickRow.className = 'modal-quick-row';
+      const selAll = document.createElement('button');
+      selAll.className   = 'btn-link'; selAll.textContent = 'Select all';
+      selAll.addEventListener('click', () => { allCbs.forEach(cb => { cb.disabled || (cb.checked = true); }); sync(); });
+      const deselAll = document.createElement('button');
+      deselAll.className   = 'btn-link'; deselAll.textContent = 'Deselect all';
+      deselAll.addEventListener('click', () => { allCbs.forEach(cb => { cb.disabled || (cb.checked = false); }); sync(); });
+      quickRow.appendChild(selAll);
+      quickRow.appendChild(deselAll);
+      box.appendChild(quickRow);
+    }
 
     const flowList = document.createElement('div');
     flowList.className = 'modal-step-list';
 
     usedInProfiles.forEach(name => {
-      const row = document.createElement('div');
-      row.className        = 'modal-step-row';
-      row.style.paddingLeft = '.3rem';
-      row.textContent      = `${name}  (saved flow)`;
-      flowList.appendChild(row);
+      const detail        = (flowDetails || {})[name] || {};
+      const currentVer    = detail.versionPin || null;
+      const upToDate      = currentVer === updateInfo.latest_version;
+
+      const label = document.createElement('label');
+      label.className = 'modal-step-row modal-flow-group';
+
+      const cb = document.createElement('input');
+      cb.type             = 'checkbox';
+      cb.checked          = !upToDate;
+      cb.disabled         = upToDate;
+      cb.dataset.flowName = name;
+      allCbs.push(cb);
+      cb.addEventListener('change', sync);
+
+      const wrap     = document.createElement('span'); wrap.className = 'modal-flow-label';
+      const nameSpan = document.createElement('span'); nameSpan.className = 'modal-flow-name';
+      nameSpan.textContent = name;
+      const verSpan  = document.createElement('span'); verSpan.className = 'modal-flow-ver';
+      verSpan.textContent = upToDate
+        ? 'already up-to-date'
+        : currentVer
+          ? `${currentVer}  →  ${updateInfo.latest_version}`
+          : `→  ${updateInfo.latest_version}`;
+
+      wrap.appendChild(nameSpan); wrap.appendChild(verSpan);
+      label.appendChild(cb); label.appendChild(wrap);
+      flowList.appendChild(label);
     });
 
     if (builderMatches.length) {
-      const flowName  = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
-      const fromVers  = [...new Set(builderMatches.map(m => m.step.version || '(unset)'))];
-      const label     = document.createElement('label');
+      const flowName = (document.getElementById('builder-profile-name').value || '').trim() || 'Builder';
+      const fromVers = [...new Set(builderMatches.map(m => m.step.version || '(unset)'))];
+      const label    = document.createElement('label');
       label.className = 'modal-step-row modal-flow-group';
       builderCb       = document.createElement('input');
       builderCb.type    = 'checkbox';
       builderCb.checked = false;
-      const wrap      = document.createElement('span');
-      wrap.className  = 'modal-flow-label';
-      const nameSpan  = document.createElement('span');
-      nameSpan.className   = 'modal-flow-name';
+      allCbs.push(builderCb);
+      builderCb.addEventListener('change', sync);
+      const wrap     = document.createElement('span'); wrap.className = 'modal-flow-label';
+      const nameSpan = document.createElement('span'); nameSpan.className = 'modal-flow-name';
       nameSpan.textContent = builderMatches.length > 1
         ? `${flowName}  (${builderMatches.length} usages)`
         : flowName;
-      const verSpan   = document.createElement('span');
-      verSpan.className   = 'modal-flow-ver';
+      const verSpan  = document.createElement('span'); verSpan.className = 'modal-flow-ver';
       verSpan.textContent = `${fromVers.join(', ')}  →  ${updateInfo.latest_version}`;
-      wrap.appendChild(nameSpan);
-      wrap.appendChild(verSpan);
-      label.appendChild(builderCb);
-      label.appendChild(wrap);
+      wrap.appendChild(nameSpan); wrap.appendChild(verSpan);
+      label.appendChild(builderCb); label.appendChild(wrap);
       flowList.appendChild(label);
     }
+
     box.appendChild(flowList);
   }
 
@@ -413,7 +455,13 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className   = 'btn btn-sm btn-primary';
-  confirmBtn.textContent = 'Update';
+  confirmBtn.textContent = 'Update selected';
+
+  function sync() {
+    confirmBtn.disabled = !allCbs.some(cb => cb.checked);
+  }
+  sync();
+
   confirmBtn.addEventListener('click', async () => {
     confirmBtn.disabled    = true;
     confirmBtn.textContent = 'Updating…';
@@ -427,10 +475,16 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
           version:      updateInfo.latest_version,
         }),
       });
+      // Patch version pins in each checked saved flow
+      const savedChecked = allCbs.filter(cb => cb.checked && cb.dataset.flowName);
+      await Promise.all(savedChecked.map(cb =>
+        api(`/api/autoload/patch-versions/${encodeURIComponent(cb.dataset.flowName + '.txt')}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: p.name, version: updateInfo.latest_version }),
+        })
+      ));
       if (builderCb && builderCb.checked) {
-        builderMatches.forEach(({ idx }) => {
-          builder.steps[idx].version = updateInfo.latest_version;
-        });
+        builderMatches.forEach(({ idx }) => { builder.steps[idx].version = updateInfo.latest_version; });
         scheduleSave();
       }
       delete state.updateResults[p.name];
@@ -441,7 +495,7 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
     } catch (e) {
       log('Update: ' + e.message, 'error');
       confirmBtn.disabled    = false;
-      confirmBtn.textContent = 'Update';
+      confirmBtn.textContent = 'Update selected';
     }
   });
 
