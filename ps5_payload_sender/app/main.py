@@ -598,23 +598,8 @@ async def api_check_updates():
                 latest     = latest_per_asset.get(asset_name)
                 if not latest:
                     continue
-                update_detected = False
-                if latest["tag"] != current:
-                    # Version tag changed — clear update
-                    update_detected = True
-                elif (m.get("release_id") and latest.get("release_id")
-                      and latest["release_id"] == m["release_id"]):
-                    # Exact same release ID: binary is identical — Latest
-                    update_detected = False
-                elif m.get("asset_size") and latest.get("size"):
-                    # Size available: different size = silent content replacement
-                    if latest["size"] != m["asset_size"]:
-                        update_detected = True
-                else:
-                    # Legacy fallback: no size/release_id stored
-                    if (latest.get("asset_updated_at") and m.get("asset_updated_at")
-                          and latest["asset_updated_at"] > m["asset_updated_at"]):
-                        update_detected = True
+                local_tags = {v["tag"] for v in (m.get("versions") or [])}
+                update_detected = latest["tag"] not in local_tags
                 if update_detected:
                     updates.append({
                         "filename": fname, "current_version": current,

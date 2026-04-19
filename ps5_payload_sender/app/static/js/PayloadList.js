@@ -381,7 +381,7 @@ function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
       label.className = 'modal-step-row';
       builderCb = document.createElement('input');
       builderCb.type    = 'checkbox';
-      builderCb.checked = true;
+      builderCb.checked = false;
       const text = document.createElement('span');
       text.textContent = `Builder — also update ${builderMatches.length} step version${builderMatches.length > 1 ? 's' : ''}`;
       label.appendChild(builderCb);
