@@ -318,7 +318,7 @@ body {
   white-space:normal; overflow:visible; text-overflow:unset;
   overflow-wrap:anywhere; line-height:1.5;
 }
-.step-autoport { font-size:.72rem; color:var(--dim); flex-shrink:0 }
+.step-autoport { font-size:.82rem; color:var(--dim); flex-shrink:0 }
 .step-btns { display:flex; gap:.2rem; flex-shrink:0 }
 
 /* ---- Inline payload edit ---- */
@@ -339,7 +339,7 @@ body {
 }
 .step-edit-select:focus { outline:none; border-color:var(--focus) }
 
-.step-details { display:flex; flex-wrap:wrap; gap:.38rem .6rem; padding-left:1.45rem }
+.step-details { display:flex; flex-wrap:wrap; gap:.38rem .6rem; padding-left:1.2rem }
 .step-field { display:flex; align-items:center; gap:.28rem }
 .step-field-label { font-size:.72rem; color:var(--muted); flex-shrink:0; white-space:nowrap }
 .step-input {
@@ -352,6 +352,25 @@ body {
 .step-unit { font-size:.72rem; color:var(--muted); flex-shrink:0 }
 .step-wait-row { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem .45rem; width:100% }
 .step-wait-inputs { display:flex; align-items:center; gap:.3rem }
+
+/* Multi-line step layout */
+.step-name-row {
+  display:flex; align-items:flex-start; gap:.35rem;
+  padding:.04rem .25rem .04rem 1.2rem;
+}
+.step-filename {
+  flex:1; font-size:.87rem; font-weight:600; line-height:1.35; min-width:0;
+  overflow-wrap:anywhere; word-break:break-word;
+  white-space:normal;
+}
+.step-info-row {
+  display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
+  padding:.02rem .25rem .04rem 1.2rem; font-size:.72rem;
+}
+.step-content-row {
+  display:flex; align-items:center; gap:.28rem;
+  padding:.04rem .25rem .04rem 1.2rem;
+}
 
 /* ---- Fade ---- */
 .fade { animation:fade .15s ease }
@@ -613,13 +632,24 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .source-status.error   { color:var(--danger) }
 
 .detected-row {
-  display:flex; align-items:center; gap:.45rem;
-  padding:.32rem .4rem; margin-bottom:.22rem;
+  display:flex; flex-direction:column; gap:.12rem;
+  padding:.38rem .45rem; margin-bottom:.22rem;
   background:var(--bg); border:1px solid var(--border);
   border-radius:.25rem;
 }
-.detected-name { flex:1; font-size:.86rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0 }
-.detected-ver  { font-size:.75rem; color:var(--muted); flex-shrink:0; font-family:monospace }
+.detected-row-top { display:flex; align-items:center; gap:.4rem }
+.detected-name {
+  flex:1; font-size:.86rem; font-weight:500;
+  overflow-wrap:anywhere; word-break:break-word;
+  line-height:1.3; min-width:0;
+}
+.detected-row-sub {
+  display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;
+  padding-left:1.55rem;
+}
+.detected-ver  { font-size:.74rem; color:var(--muted); font-family:monospace; flex-shrink:0 }
+.detected-path { font-size:.72rem; color:var(--dim); overflow-wrap:anywhere; min-width:0 }
+.badge-zip { background:rgba(148,163,184,.18); color:var(--muted) }
 
 /* Source row in payload list */
 .p-row-source {
@@ -640,18 +670,22 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 }
 .source-update-btn:hover { background:var(--green); color:#fff }
 
-/* Inline source/version row inside builder payload steps */
-.step-src-row {
+/* Inline filename + source/version rows inside builder payload steps */
+.step-name-row {
+  padding:.1rem .5rem .1rem 1.55rem; font-size:.87rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.step-info-row {
   display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
   padding:.18rem .5rem .18rem 1.55rem; margin-top:.05rem;
-  border-top:1px solid var(--border); font-size:.72rem;
+  border-top:1px solid var(--border); font-size:.82rem;
 }
 .step-src-repo  { color:var(--dim); flex-shrink:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
 .step-ver-label { color:var(--dim); flex-shrink:0 }
 .step-ver-inline {
-  font-size:.72rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
+  font-size:.82rem; padding:.08rem .3rem; height:auto; flex-shrink:0;
   border:1px solid var(--border); border-radius:.2rem;
-  background:var(--input-bg); color:var(--fg); max-width:130px;
+  background:var(--input-bg); color:var(--text); max-width:130px;
 }
 .step-local-file { color:var(--dim); font-style:italic; flex-shrink:0 }
 
@@ -660,7 +694,7 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .p-ver-select {
   font-size:.72rem; padding:.08rem .3rem; height:auto;
   border:1px solid var(--border); border-radius:.2rem;
-  background:var(--input-bg); color:var(--fg); max-width:140px; flex-shrink:0;
+  background:var(--input-bg); color:var(--text); max-width:140px; flex-shrink:0;
 }
 /* Local file badge (no source control) */
 .p-local-file { font-size:.72rem; color:var(--dim); font-style:italic; flex-shrink:0 }
@@ -696,6 +730,10 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 
 /* ---- Mobile scaling fixes ---- */
 @media (max-width: 480px) {
+  .header { padding: .35rem .7rem }
+  .header-adv-label { display: none }
+  .header-actions { gap: .22rem }
+
   .main { padding: .65rem }
   .card { padding: .75rem .85rem }
 
@@ -975,3 +1013,37 @@ body.advanced-mode .adv-hint { display: none !important }
   font-size: .85rem; cursor: pointer;
 }
 .radio-label input[type="radio"] { accent-color: var(--primary) }
+
+/* ── Update-usages modal ── */
+.modal-overlay {
+  position:fixed; inset:0; z-index:500;
+  background:rgba(0,0,0,.55); display:flex;
+  align-items:center; justify-content:center;
+}
+.modal-box {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1.2rem 1.4rem;
+  min-width:260px; max-width:420px; width:90%;
+  box-shadow:var(--shadow); display:flex; flex-direction:column; gap:.7rem;
+}
+.modal-title    { font-size:.9rem; font-weight:700 }
+.modal-ver-info { font-size:.82rem; color:var(--muted) }
+.modal-step-list { display:flex; flex-direction:column; gap:.4rem }
+.modal-step-row {
+  display:flex; align-items:center; gap:.5rem;
+  font-size:.83rem; cursor:pointer; user-select:none;
+}
+.modal-step-row.modal-flow-group { align-items:flex-start }
+.modal-step-row input[type=checkbox] { accent-color:var(--primary); cursor:pointer; margin-top:.15rem }
+.modal-flow-label { display:flex; flex-direction:column; gap:.18rem }
+.modal-flow-name  { font-weight:600; font-size:.83rem }
+.modal-flow-ver   { font-size:.76rem; color:var(--muted) }
+.modal-quick-row {
+  display:flex; gap:.8rem; font-size:.78rem; margin-bottom:-.1rem;
+}
+.btn-link {
+  background:none; border:none; padding:0; cursor:pointer;
+  color:var(--primary); font-size:.78rem; text-decoration:underline;
+}
+.btn-link:hover { opacity:.75 }
+.modal-btn-row { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.2rem }

@@ -19,10 +19,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 GITHUB_API = "https://api.github.com"
-_HEADERS = {
-    "User-Agent": "PS5AutopayloadHA/1.0",
-    "Accept": "application/vnd.github.v3+json",
-}
+
+def _build_headers() -> dict:
+    from config import GITHUB_TOKEN
+    h = {
+        "User-Agent": "PS5AutopayloadHA/1.0",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    if GITHUB_TOKEN:
+        h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return h
+
+_HEADERS = _build_headers()
 _PAYLOAD_EXTENSIONS = {".elf", ".lua"}
 
 # ── In-memory tree cache ──────────────────────────────────────────
@@ -32,8 +40,15 @@ _CACHE_TTL = 300  # seconds
 
 def _gh_get(url: str, timeout: int = 15) -> Any:
     req = urllib.request.Request(url, headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            raise RuntimeError(
+                "GitHub API rate limit exceeded — add a GitHub token in add-on options to raise the limit."
+            ) from e
+        raise
 
 
 # ── Repo file scanning ────────────────────────────────────────────
@@ -123,32 +138,38 @@ def invalidate_cache(owner: str, repo: str) -> None:
     _tree_cache.pop(f"{owner}/{repo}", None)
 
 
-# ── Release assets (ZIP strictly excluded) ────────────────────────
+# ── Release assets ────────────────────────────────────────────────
 
 def get_releases(owner: str, repo: str) -> List[Dict[str, Any]]:
     """
-    Return all .elf / .lua release assets.  ZIP assets are silently ignored.
-    Each entry: { tag, asset_name, download_url, size, ext, is_zip:False,
-                  source_type:"release" }
+    Return .elf/.lua and .zip release assets for the last 3 releases.
+    ZIP assets have is_zip=True; download_payload() handles extraction.
+    Includes published_at and asset_updated_at for smart update detection.
     """
-    url = f"{GITHUB_API}/repos/{owner}/{repo}/releases?per_page=100"
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/releases?per_page=3"
     releases = _gh_get(url)
 
     result: List[Dict[str, Any]] = []
-    for rel in releases:
-        tag = rel.get("tag_name", "")
+    for rel in releases[:3]:
+        tag          = rel.get("tag_name", "")
+        published_at = rel.get("published_at", "")
+        release_id   = rel.get("id", 0)
         for asset in rel.get("assets", []):
-            ext = Path(asset["name"]).suffix.lower()
-            if ext not in _PAYLOAD_EXTENSIONS:
-                continue          # ZIP and everything else silently skipped
+            ext    = Path(asset["name"]).suffix.lower()
+            is_zip = ext == ".zip"
+            if ext not in _PAYLOAD_EXTENSIONS and not is_zip:
+                continue
             result.append({
-                "tag":          tag,
-                "asset_name":   asset["name"],
-                "download_url": asset["browser_download_url"],
-                "size":         asset.get("size", 0),
-                "ext":          ext,
-                "is_zip":       False,
-                "source_type":  "release",
+                "tag":              tag,
+                "asset_name":       asset["name"],
+                "download_url":     asset["browser_download_url"],
+                "size":             asset.get("size", 0),
+                "release_id":       release_id,
+                "ext":              ext,
+                "is_zip":           is_zip,
+                "source_type":      "release",
+                "published_at":     published_at,
+                "asset_updated_at": asset.get("updated_at", ""),
             })
     return result
 

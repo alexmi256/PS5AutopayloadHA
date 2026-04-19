@@ -43,8 +43,9 @@ function renderSourcesList() {
     const info = document.createElement('div');
     info.className = 'source-info';
     const nameEl = document.createElement('span');
-    nameEl.className = 'source-repo';
-    nameEl.textContent = src.repo;
+    nameEl.className   = 'source-repo';
+    nameEl.textContent = src.display_name || src.repo;
+    nameEl.title       = src.repo;
     info.appendChild(nameEl);
     if (src.filter) {
       const filterEl = document.createElement('span');
@@ -106,8 +107,9 @@ function _openSourcePanel(prefill = null) {
   _editingSourceRepo = prefill ? prefill.repo : null;
 
   // Pre-fill (edit mode) or clear (add mode)
-  document.getElementById('source-repo-input').value  = prefill?.repo    || '';
-  document.getElementById('source-filter-input').value = prefill?.filter || '';
+  document.getElementById('source-repo-input').value    = prefill?.repo         || '';
+  document.getElementById('source-display-input').value = prefill?.display_name || '';
+  document.getElementById('source-filter-input').value  = prefill?.filter       || '';
 
   // Source type radio
   const typeVal = prefill?.source_type || 'auto';
@@ -161,7 +163,8 @@ async function saveSourceConfig() {
   const sourceType = _getSourceType();
   const folder = sourceType === 'folder'
     ? (document.getElementById('source-folder-select')?.value || '') : '';
-  const filter = document.getElementById('source-filter-input').value.trim();
+  const filter      = document.getElementById('source-filter-input').value.trim();
+  const displayName = document.getElementById('source-display-input').value.trim();
 
   try {
     // Delete old + add updated entry
@@ -173,7 +176,7 @@ async function saveSourceConfig() {
     await api(`/api/sources/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filter, source_type: sourceType, folder }),
+      body: JSON.stringify({ filter, source_type: sourceType, folder, display_name: displayName }),
     });
     statusEl.textContent = 'Source updated.'; statusEl.className = 'source-status ok';
     _editingSourceRepo = null;
@@ -274,9 +277,10 @@ async function addSource() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         repo,
-        filter:      filterInput.value.trim(),
-        source_type: sourceType,
+        filter:       filterInput.value.trim(),
+        source_type:  sourceType,
         folder,
+        display_name: document.getElementById('source-display-input').value.trim(),
       }),
     });
     const linked = data.auto_linked || [];
@@ -292,6 +296,7 @@ async function addSource() {
     _editingSourceRepo = null;
     repoInput.value   = '';
     filterInput.value = '';
+    document.getElementById('source-display-input').value = '';
   } catch (e) {
     const txt = e.message.includes('404')
       ? 'No .elf/.lua payload files found. ZIP-only releases are not supported.'
@@ -322,12 +327,16 @@ function _renderDetectedPayloads(repo, assets) {
 
     const row = document.createElement('div');
     row.className = 'detected-row';
-    row.dataset.repo        = repo;
-    row.dataset.assetName   = assetName;
-    row.dataset.downloadUrl = latest.download_url;
-    row.dataset.version     = latest.tag;
-    row.dataset.path        = latest.path || '';
-    row.dataset.allVersions = JSON.stringify(
+    row.dataset.repo           = repo;
+    row.dataset.assetName      = assetName;
+    row.dataset.downloadUrl    = latest.download_url;
+    row.dataset.version        = latest.tag;
+    row.dataset.path           = latest.path || '';
+    row.dataset.publishedAt    = latest.published_at    || '';
+    row.dataset.assetUpdatedAt = latest.asset_updated_at || '';
+    row.dataset.assetSize      = String(latest.size       || 0);
+    row.dataset.releaseId      = String(latest.release_id || 0);
+    row.dataset.allVersions    = JSON.stringify(
       versions.map(v => ({ tag: v.tag, download_url: v.download_url, path: v.path || '' }))
     );
 
@@ -336,32 +345,41 @@ function _renderDetectedPayloads(repo, assets) {
     cb.addEventListener('change', _updateDetectedSelectionUI);
 
     const badge = document.createElement('span');
-    badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
-    badge.textContent = ext.replace('.', '').toUpperCase();
+    badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : ext === '.zip' ? 'badge-zip' : 'badge-elf'}`;
+    badge.textContent = ext.replace('.', '').toUpperCase() || 'FILE';
 
-    const nameWrap = document.createElement('span');
-    nameWrap.className = 'detected-name-wrap';
-
+    // Top row: checkbox + badge + filename
+    const rowTop = document.createElement('div');
+    rowTop.className = 'detected-row-top';
     const nameEl = document.createElement('span');
-    nameEl.className  = 'detected-name';
+    nameEl.className   = 'detected-name';
     nameEl.textContent = assetName;
-    nameWrap.appendChild(nameEl);
+    rowTop.appendChild(cb);
+    rowTop.appendChild(badge);
+    rowTop.appendChild(nameEl);
+    row.appendChild(rowTop);
 
-    if (latest.path && latest.path !== assetName) {
-      const pathEl = document.createElement('span');
-      pathEl.className  = 'detected-path';
-      pathEl.textContent = latest.path;
-      nameWrap.appendChild(pathEl);
+    // Sub row: version + path (if present)
+    const hasVer  = latest.tag && latest.tag !== 'latest';
+    const hasPath = latest.path && latest.path !== assetName;
+    if (hasVer || hasPath) {
+      const rowSub = document.createElement('div');
+      rowSub.className = 'detected-row-sub';
+      if (hasVer) {
+        const verEl = document.createElement('span');
+        verEl.className   = 'detected-ver';
+        verEl.textContent = latest.tag;
+        rowSub.appendChild(verEl);
+      }
+      if (hasPath) {
+        const pathEl = document.createElement('span');
+        pathEl.className   = 'detected-path';
+        pathEl.textContent = latest.path;
+        rowSub.appendChild(pathEl);
+      }
+      row.appendChild(rowSub);
     }
 
-    const verEl = document.createElement('span');
-    verEl.className   = 'detected-ver';
-    verEl.textContent = latest.tag !== 'latest' ? latest.tag : '';
-
-    row.appendChild(cb);
-    row.appendChild(badge);
-    row.appendChild(nameWrap);
-    row.appendChild(verEl);
     listEl.appendChild(row);
   });
 
@@ -411,11 +429,15 @@ async function importSelected() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo:         row.dataset.repo,
-          asset_name:   row.dataset.assetName,
-          download_url: row.dataset.downloadUrl,
-          version:      row.dataset.version,
-          all_versions: allVersions,
+          repo:                 row.dataset.repo,
+          asset_name:           row.dataset.assetName,
+          download_url:         row.dataset.downloadUrl,
+          version:              row.dataset.version,
+          all_versions:         allVersions,
+          release_published_at: row.dataset.publishedAt    || '',
+          asset_updated_at:     row.dataset.assetUpdatedAt || '',
+          asset_size:           parseInt(row.dataset.assetSize)  || 0,
+          release_id:           parseInt(row.dataset.releaseId)  || 0,
         }),
       });
       imported++;
@@ -557,12 +579,14 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
       const ext = asset.name.includes('.') ? asset.name.slice(asset.name.lastIndexOf('.')).toLowerCase() : '';
       const row = document.createElement('div');
       row.className = 'detected-row';
-      row.dataset.repo        = repo;
-      row.dataset.assetName   = asset.name;
-      row.dataset.downloadUrl = asset.latest.download_url;
-      row.dataset.version     = asset.latest.tag;
-      row.dataset.path        = asset.latest.path || '';
-      row.dataset.allVersions = JSON.stringify(
+      row.dataset.repo           = repo;
+      row.dataset.assetName      = asset.name;
+      row.dataset.downloadUrl    = asset.latest.download_url;
+      row.dataset.version        = asset.latest.tag;
+      row.dataset.path           = asset.latest.path || '';
+      row.dataset.publishedAt    = asset.latest.published_at    || '';
+      row.dataset.assetUpdatedAt = asset.latest.asset_updated_at || '';
+      row.dataset.allVersions    = JSON.stringify(
         asset.versions.map(v => ({ tag: v.tag, download_url: v.download_url }))
       );
 
@@ -571,28 +595,36 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
       cb.addEventListener('change', updatePanelCount);
 
       const badge = document.createElement('span');
-      badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : 'badge-elf'}`;
+      badge.className   = `badge ${ext === '.lua' ? 'badge-lua' : ext === '.zip' ? 'badge-zip' : 'badge-elf'}`;
       badge.textContent = ext.replace('.', '').toUpperCase() || 'FILE';
 
-      const nameWrap = document.createElement('span');
-      nameWrap.className = 'detected-name-wrap';
-
+      // Top row: checkbox + badge + filename
+      const rowTop = document.createElement('div');
+      rowTop.className = 'detected-row-top';
       const nameEl = document.createElement('span');
       nameEl.className = 'detected-name'; nameEl.textContent = asset.name;
-      nameWrap.appendChild(nameEl);
+      rowTop.appendChild(cb); rowTop.appendChild(badge); rowTop.appendChild(nameEl);
+      row.appendChild(rowTop);
 
-      if (asset.latest.path && asset.latest.path !== asset.name) {
-        const pathEl = document.createElement('span');
-        pathEl.className = 'detected-path'; pathEl.textContent = asset.latest.path;
-        nameWrap.appendChild(pathEl);
+      // Sub row: version + path
+      const hasVer  = asset.latest.tag && asset.latest.tag !== 'latest';
+      const hasPath = asset.latest.path && asset.latest.path !== asset.name;
+      if (hasVer || hasPath) {
+        const rowSub = document.createElement('div');
+        rowSub.className = 'detected-row-sub';
+        if (hasVer) {
+          const verEl = document.createElement('span');
+          verEl.className = 'detected-ver'; verEl.textContent = asset.latest.tag;
+          rowSub.appendChild(verEl);
+        }
+        if (hasPath) {
+          const pathEl = document.createElement('span');
+          pathEl.className = 'detected-path'; pathEl.textContent = asset.latest.path;
+          rowSub.appendChild(pathEl);
+        }
+        row.appendChild(rowSub);
       }
 
-      const verEl = document.createElement('span');
-      verEl.className = 'detected-ver';
-      verEl.textContent = asset.latest.tag !== 'latest' ? asset.latest.tag : '';
-
-      row.appendChild(cb); row.appendChild(badge);
-      row.appendChild(nameWrap); row.appendChild(verEl);
       list.appendChild(row);
     });
 
@@ -625,11 +657,15 @@ async function _importFromPanel(list, btn, panel) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo:         row.dataset.repo,
-          asset_name:   row.dataset.assetName,
-          download_url: row.dataset.downloadUrl,
-          version:      row.dataset.version,
-          all_versions: allVersions,
+          repo:                 row.dataset.repo,
+          asset_name:           row.dataset.assetName,
+          download_url:         row.dataset.downloadUrl,
+          version:              row.dataset.version,
+          all_versions:         allVersions,
+          release_published_at: row.dataset.publishedAt    || '',
+          asset_updated_at:     row.dataset.assetUpdatedAt || '',
+          asset_size:           parseInt(row.dataset.assetSize)  || 0,
+          release_id:           parseInt(row.dataset.releaseId)  || 0,
         }),
       });
       imported++;

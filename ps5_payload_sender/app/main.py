@@ -15,6 +15,7 @@ WebSocket endpoint, and static-file mount.  All heavy logic lives in focused mod
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import logging
@@ -42,7 +43,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 import payload_sender as _ps_module
-from autoload_parser import DelayDirective, SendDirective, WaitPortDirective, parse_autoload_path
+from autoload_parser import (
+    DelayDirective, SendDirective, WaitPortDirective,
+    parse_autoload_path, parse_version_pins, set_version_pin,
+)
 from config import (
     APP_VERSION,
     ALLOWED_PAYLOAD_EXTENSIONS,
@@ -87,8 +91,10 @@ from models import (
     FlowAnalyzeRequest,
     ImportPayloadRequest,
     PortCheckRequest,
+    PatchFlowVersionsRequest,
     SaveProfileRequest,
     SendRequest,
+    SetDefaultVersionRequest,
     SourceAddRequest,
     SourceUpdateRequest,
     SwitchVersionRequest,
@@ -113,6 +119,7 @@ from storage import (
     save_sources,
     save_ui_state,
     setup_storage,
+    sort_versions,
     trim_versions,
 )
 from websocket_manager import manager
@@ -398,6 +405,7 @@ async def api_add_source(req: SourceAddRequest):
             meta[aname] = {
                 "repo": slug, "asset": aname,
                 "version": versions[0]["tag"], "versions": versions,
+                "display_name": req.display_name.strip(),
             }
             auto_linked.append(aname)
     if auto_linked:
@@ -410,6 +418,7 @@ async def api_add_source(req: SourceAddRequest):
             "filter": req.filter.strip(),
             "source_type": req.source_type,
             "folder": req.folder.strip(),
+            "display_name": req.display_name.strip(),
         })
         save_sources(sources)
 
@@ -434,6 +443,7 @@ async def api_update_source(owner: str, repo_name: str, req: SourceUpdateRequest
             s["filter"] = req.filter.strip()
             s["source_type"] = req.source_type
             s["folder"] = req.folder.strip()
+            s["display_name"] = req.display_name.strip()
             updated = True
             break
     if not updated:
@@ -472,12 +482,32 @@ async def api_import_payload(req: ImportPayloadRequest):
     safe = Path(actual_name).name
     if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
         raise HTTPException(400, "Only .elf and .lua files allowed")
+    payload_hash = hashlib.sha256(data).hexdigest()
     (PAYLOAD_DIR / safe).write_bytes(data)
     meta = load_payload_meta()
-    raw_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    existing = meta.get(safe, {})
+    existing_versions = existing.get("versions", [])
+    new_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    # Union: new_versions first (fresher URLs), then existing tags not already included
+    seen_tags: set = set()
+    merged: list = []
+    for v in (new_versions + existing_versions):
+        if v["tag"] not in seen_tags:
+            merged.append(v)
+            seen_tags.add(v["tag"])
+    sources = load_sources()
+    src_entry = next((s for s in sources if s["repo"] == req.repo), {})
+    display_name = src_entry.get("display_name", "")
     meta[safe] = {
+        **existing,
         "repo": req.repo, "asset": req.asset_name,
-        "version": req.version, "versions": trim_versions(raw_versions),
+        "version": req.version, "versions": trim_versions(sort_versions(merged)),
+        "display_name":         display_name,
+        "payload_hash":         payload_hash,
+        "release_published_at": req.release_published_at,
+        "asset_updated_at":     req.asset_updated_at,
+        "asset_size":           req.asset_size,
+        "release_id":           req.release_id,
     }
     save_payload_meta(meta)
     await manager.status(f"'{safe}' imported from {req.repo} {req.version}", level="success")
@@ -512,6 +542,18 @@ async def api_switch_version(filename: str, req: SwitchVersionRequest):
     save_payload_meta(meta)
     await manager.status(f"'{safe}' switched to {req.version}", level="success")
     return {"success": True, "filename": safe, "version": req.version, "backup_version": backup_version}
+
+
+@app.post("/api/payloads/{filename}/set-default-version")
+async def api_set_default_version(filename: str, req: SetDefaultVersionRequest):
+    """Update the default version tag in metadata without downloading the binary."""
+    meta = load_payload_meta()
+    safe = Path(filename).name
+    if safe not in meta:
+        raise HTTPException(404, "Payload not in metadata")
+    meta[safe]["version"] = req.version
+    save_payload_meta(meta)
+    return {"ok": True, "version": req.version}
 
 
 @app.post("/api/payloads/{filename}/rollback")
@@ -554,11 +596,15 @@ async def api_check_updates():
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
             latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
             for fname in filenames:
-                m = meta.get(fname, {})
+                m          = meta.get(fname, {})
                 current    = m.get("version", "")
                 asset_name = m.get("asset", fname)
                 latest     = latest_per_asset.get(asset_name)
-                if latest and latest["tag"] != current:
+                if not latest:
+                    continue
+                local_tags = {v["tag"] for v in (m.get("versions") or [])}
+                update_detected = latest["tag"] not in local_tags
+                if update_detected:
                     updates.append({
                         "filename": fname, "current_version": current,
                         "latest_version": latest["tag"],
@@ -651,6 +697,8 @@ async def api_parse_profile(profile: str):
     p = PROFILES_DIR / Path(profile).name
     if not p.exists():
         raise HTTPException(404, "Profile not found")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    version_pins = parse_version_pins(content)
     steps = []
     for d in parse_autoload_path(p):
         if isinstance(d, SendDirective):
@@ -659,6 +707,7 @@ async def api_parse_profile(profile: str):
                 "filename": d.filename,
                 "autoPort": resolve_port(d.filename),
                 "portOverride": d.port,
+                "version": version_pins.get(d.filename),
             })
         elif isinstance(d, DelayDirective):
             steps.append({"type": "delay", "ms": d.milliseconds})
@@ -669,7 +718,18 @@ async def api_parse_profile(profile: str):
                 "timeout": d.timeout_seconds,
                 "interval_ms": d.interval_ms,
             })
-    return {"steps": steps, "profile": p.name}
+    return {"steps": steps, "profile": p.name, "version_pins": version_pins}
+
+
+@app.post("/api/autoload/patch-versions/{profile}")
+async def api_patch_flow_versions(profile: str, req: PatchFlowVersionsRequest):
+    p = PROFILES_DIR / Path(profile).name
+    if not p.exists():
+        raise HTTPException(404, "Profile not found")
+    content = p.read_text(encoding="utf-8", errors="replace")
+    content = set_version_pin(content, req.filename, req.version)
+    p.write_text(content, encoding="utf-8")
+    return {"ok": True}
 
 
 @app.post("/api/autoload/export-zip")

@@ -64,8 +64,8 @@ def setup_storage() -> None:
         DEVICES_FILE.write_bytes(OLD_DEVICES_FILE.read_bytes())
 
     # Remove legacy default profiles that are now built-in
-    for name in ("ftp.txt", "goldhen.txt"):
-        for d in (PAYLOAD_DIR, PROFILES_DIR):
+    for name in ("ftp.txt", "goldhen.txt", "autoload.txt"):
+        for d in (OLD_PAYLOAD_DIR, PAYLOAD_DIR, PROFILES_DIR):
             p = d / name
             if p.exists():
                 p.unlink()
@@ -174,7 +174,19 @@ def list_profiles() -> List[str]:
     ]
 
 
-# ── Version limit helper ──────────────────────────────────────────
+# ── Version helpers ───────────────────────────────────────────────
+
+def sort_versions(versions: list) -> list:
+    """Stable-sort versions: stable releases → beta → alpha/test."""
+    def _tier(v: dict) -> int:
+        tag = v.get("tag", "").lower()
+        if "alpha" in tag or "test" in tag:
+            return 2
+        if "beta" in tag:
+            return 1
+        return 0
+    return sorted(versions, key=_tier)
+
 
 def trim_versions(versions: list) -> list:
     """Keep only the newest MAX_PAYLOAD_VERSIONS entries."""

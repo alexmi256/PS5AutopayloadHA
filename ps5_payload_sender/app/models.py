@@ -39,6 +39,7 @@ class SourceAddRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"   # "auto" | "releases" | "folder"
     folder: str = ""            # only used when source_type == "folder"
+    display_name: str = ""
 
 
 class ImportPayloadRequest(BaseModel):
@@ -47,12 +48,20 @@ class ImportPayloadRequest(BaseModel):
     download_url: str
     version: str
     all_versions: List[Dict[str, str]] = []   # [{tag, download_url}, ...]
+    release_published_at: str = ""
+    asset_updated_at: str = ""
+    asset_size: int = 0
+    release_id: int = 0
 
 
 class SwitchVersionRequest(BaseModel):
     repo: str
     asset_name: str
     download_url: str
+    version: str
+
+
+class SetDefaultVersionRequest(BaseModel):
     version: str
 
 
@@ -87,3 +96,9 @@ class SourceUpdateRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"
     folder: str = ""
+    display_name: str = ""
+
+
+class PatchFlowVersionsRequest(BaseModel):
+    filename: str
+    version: str

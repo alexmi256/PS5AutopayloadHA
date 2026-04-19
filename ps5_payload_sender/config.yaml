@@ -1,6 +1,6 @@
 name: PS5 Autopayload
 description: Manage and automate PS5 payload workflows from Home Assistant
-version: "1.1.0"
+version: "1.1.1"
 slug: ps5_payload_sender
 init: false
 arch:
@@ -23,12 +23,14 @@ options:
   elf_port: 9021
   port_check_timeout: 10
   port_check_interval: 500
+  github_token: ""
 schema:
   ps5_ip: str
   lua_port: int
   elf_port: int
   port_check_timeout: int
   port_check_interval: int
+  github_token: str?
 panel_icon: mdi:gamepad-variant
 panel_title: PS5 Autopayload
 map:

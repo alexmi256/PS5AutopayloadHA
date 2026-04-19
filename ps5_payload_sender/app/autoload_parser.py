@@ -44,6 +44,36 @@ _PAYLOAD_RE = re.compile(
     re.IGNORECASE
 )
 
+_VERSION_PIN_RE = re.compile(r'^#\s*~version\s+(\S+)\s+(\S+)\s*$')
+
+
+def parse_version_pins(content: str) -> dict:
+    """Return {filename: version_tag} for all ~version annotations in a flow file."""
+    pins: dict = {}
+    for line in content.splitlines():
+        m = _VERSION_PIN_RE.match(line.strip())
+        if m:
+            pins[m.group(1)] = m.group(2)
+    return pins
+
+
+def set_version_pin(content: str, filename: str, version: str) -> str:
+    """Set or replace the ~version annotation for *filename* in *content*."""
+    pin_line = f'# ~version {filename} {version}'
+    lines = content.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        m = _VERSION_PIN_RE.match(line.strip())
+        if m and m.group(1) == filename:
+            lines[i] = pin_line + ('\n' if line.endswith('\n') else '')
+            return ''.join(lines)
+    # Not found: insert before the first non-comment, non-empty line
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#'):
+            lines.insert(i, pin_line + '\n')
+            return ''.join(lines)
+    return ''.join(lines) + pin_line + '\n'
+
 
 def parse_line(line: str) -> Optional[Directive]:
     line = line.strip()
