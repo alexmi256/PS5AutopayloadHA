@@ -16,7 +16,7 @@ function renderProfileList() {
   const container = document.getElementById('profile-list');
   container.innerHTML = '';
   if (!state.profiles.length) {
-    container.innerHTML = '<div class="empty-state">Your saved profiles will appear here.</div>';
+    container.innerHTML = '<div class="empty-state">No flows created yet.</div>';
     return;
   }
 

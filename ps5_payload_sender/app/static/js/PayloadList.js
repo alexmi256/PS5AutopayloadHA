@@ -214,31 +214,22 @@ function buildPayloadItem(p) {
       warnEl.title       = 'New version available on GitHub';
       const updBtn = document.createElement('button');
       updBtn.className   = 'btn btn-sm source-update-btn';
-      updBtn.textContent = 'Update';
+      updBtn.textContent = 'Update flows';
       updBtn.addEventListener('click', async ev => {
         ev.stopPropagation();
-        // Workflow check before updating
-        let usedIn = [];
-        try { const u = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`); usedIn = u.used_in || []; } catch (_) {}
-        if (builder.steps.some(s => s.type === 'payload' && s.filename === p.name)) usedIn.push('Builder');
-        if (usedIn.length && !confirm(`'${p.name}' is used in: ${usedIn.join(', ')}.\nUpdate to ${updateInfo.latest_version}?`)) return;
-        updBtn.disabled = true; updBtn.textContent = 'Updating…';
+        updBtn.disabled    = true;
+        updBtn.textContent = 'Loading…';
+        let usedInProfiles = [];
         try {
-          await api(`/api/payloads/${encodeURIComponent(p.name)}/switch-version`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              repo: updateInfo.repo, asset_name: updateInfo.asset_name,
-              download_url: updateInfo.download_url, version: updateInfo.latest_version,
-            }),
-          });
-          delete state.updateResults[p.name];
-          showToast(`Updated to ${updateInfo.latest_version}`);
-          await refreshPayloads();
-          if (typeof checkAllUpdates === 'function') checkAllUpdates();
-        } catch (e) {
-          log('Update: ' + e.message, 'error');
-          updBtn.disabled = false; updBtn.textContent = 'Update';
-        }
+          const u = await api(`/api/payloads/${encodeURIComponent(p.name)}/usage`);
+          usedInProfiles = u.used_in || [];
+        } catch (_) {}
+        const builderMatches = builder.steps
+          .map((s, idx) => ({ step: s, idx }))
+          .filter(({ step }) => step.type === 'payload' && step.filename === p.name);
+        updBtn.disabled    = false;
+        updBtn.textContent = 'Update flows';
+        _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches);
       });
       rowSrc.appendChild(warnEl);
       rowSrc.appendChild(updBtn);
@@ -349,6 +340,105 @@ async function bulkDeleteSelected() {
   state.selectedPayloads = new Set();
   await refreshPayloads();
   if (deleted > 0) { log(`${deleted} payload(s) deleted`, 'success'); showToast(`${deleted} payload(s) deleted`); }
+}
+
+function _openUpdateFlowsDialog(p, updateInfo, usedInProfiles, builderMatches) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+
+  const title = document.createElement('div');
+  title.className   = 'modal-title';
+  title.textContent = `Update — ${p.name}`;
+  box.appendChild(title);
+
+  const verInfo = document.createElement('div');
+  verInfo.className   = 'modal-ver-info';
+  verInfo.textContent = `New version: ${updateInfo.latest_version}`;
+  box.appendChild(verInfo);
+
+  let builderCb = null;
+  if (usedInProfiles.length || builderMatches.length) {
+    const flowsLabel = document.createElement('div');
+    flowsLabel.className   = 'modal-ver-info';
+    flowsLabel.textContent = 'Flows that will receive this update:';
+    box.appendChild(flowsLabel);
+
+    const flowList = document.createElement('div');
+    flowList.className = 'modal-step-list';
+
+    usedInProfiles.forEach(name => {
+      const row = document.createElement('div');
+      row.className        = 'modal-step-row';
+      row.style.paddingLeft = '.3rem';
+      row.textContent      = `${name}  (saved flow)`;
+      flowList.appendChild(row);
+    });
+
+    if (builderMatches.length) {
+      const label = document.createElement('label');
+      label.className = 'modal-step-row';
+      builderCb = document.createElement('input');
+      builderCb.type    = 'checkbox';
+      builderCb.checked = true;
+      const text = document.createElement('span');
+      text.textContent = `Builder — also update ${builderMatches.length} step version${builderMatches.length > 1 ? 's' : ''}`;
+      label.appendChild(builderCb);
+      label.appendChild(text);
+      flowList.appendChild(label);
+    }
+    box.appendChild(flowList);
+  }
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'modal-btn-row';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className   = 'btn btn-sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => overlay.remove());
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className   = 'btn btn-sm btn-primary';
+  confirmBtn.textContent = 'Update';
+  confirmBtn.addEventListener('click', async () => {
+    confirmBtn.disabled    = true;
+    confirmBtn.textContent = 'Updating…';
+    try {
+      await api(`/api/payloads/${encodeURIComponent(p.name)}/switch-version`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo:         updateInfo.repo,
+          asset_name:   updateInfo.asset_name,
+          download_url: updateInfo.download_url,
+          version:      updateInfo.latest_version,
+        }),
+      });
+      if (builderCb && builderCb.checked) {
+        builderMatches.forEach(({ idx }) => {
+          builder.steps[idx].version = updateInfo.latest_version;
+        });
+        scheduleSave();
+      }
+      delete state.updateResults[p.name];
+      overlay.remove();
+      showToast(`Updated to ${updateInfo.latest_version}`);
+      await refreshPayloads();
+      if (typeof checkAllUpdates === 'function') checkAllUpdates();
+    } catch (e) {
+      log('Update: ' + e.message, 'error');
+      confirmBtn.disabled    = false;
+      confirmBtn.textContent = 'Update';
+    }
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 function _openUpdateUsagesDialog(p, stepMatches) {

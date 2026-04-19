@@ -307,8 +307,8 @@
         <div style="margin-top:.75rem">
           <div class="row-gap builder-footer">
             <input type="text" id="builder-profile-name" class="input"
-              placeholder="Profile name" />
-            <button id="btn-builder-save" class="btn btn-secondary" title="Save as profile">💾</button>
+              placeholder="Flow name" />
+            <button id="btn-builder-save" class="btn btn-secondary" title="Save as flow">💾</button>
             <button id="btn-builder-run"  class="btn btn-primary btn-xl">▶ Run</button>
           </div>
           <button onclick="exportAutoloadZip()" class="btn btn-sm btn-block"
@@ -324,7 +324,7 @@
     <section class="card collapsible" id="section-profiles">
       <div class="collapse-header">
         <span class="collapse-arrow open" aria-hidden="true">▶</span>
-        <h2 class="card-title">Saved Profiles</h2>
+        <h2 class="card-title">Saved Flows</h2>
         <span class="collapse-summary" id="summary-profiles"></span>
       </div>
       <div class="collapse-body">
@@ -336,7 +336,7 @@
           Continue on error
         </label>
         <div id="profile-list" class="profile-list">
-          <div class="empty-state">No profiles saved.</div>
+          <div class="empty-state">No flows created yet.</div>
         </div>
       </div>
     </section>
@@ -423,7 +423,7 @@
         <label class="import-check-row"><input type="checkbox" id="imp-sources"  checked> Payload Sources</label>
         <label class="import-check-row"><input type="checkbox" id="imp-payloads" checked> Payloads</label>
         <label class="import-check-row"><input type="checkbox" id="imp-flows"    checked> Auto-Load Builder (Flows)</label>
-        <label class="import-check-row"><input type="checkbox" id="imp-profiles" checked> Profiles</label>
+        <label class="import-check-row"><input type="checkbox" id="imp-profiles" checked> Flows</label>
         <label class="import-check-row"><input type="checkbox" id="imp-settings" checked> Settings</label>
       </div>
 

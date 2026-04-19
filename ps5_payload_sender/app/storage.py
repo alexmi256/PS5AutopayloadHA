@@ -64,8 +64,8 @@ def setup_storage() -> None:
         DEVICES_FILE.write_bytes(OLD_DEVICES_FILE.read_bytes())
 
     # Remove legacy default profiles that are now built-in
-    for name in ("ftp.txt", "goldhen.txt"):
-        for d in (PAYLOAD_DIR, PROFILES_DIR):
+    for name in ("ftp.txt", "goldhen.txt", "autoload.txt"):
+        for d in (OLD_PAYLOAD_DIR, PAYLOAD_DIR, PROFILES_DIR):
             p = d / name
             if p.exists():
                 p.unlink()
