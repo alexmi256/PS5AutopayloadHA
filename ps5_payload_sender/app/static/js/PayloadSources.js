@@ -511,14 +511,16 @@ async function checkSourceUpdates(repo, sourceEl) {
 
     if (!state.updateResults) state.updateResults = {};
     let updatesAvail = 0;
+    // Single-payload repo with a single-asset newest release: trust the newest
+    // release as the successor for the one tracked payload, regardless of
+    // whether the saved asset filename still matches.
+    const singlePayloadRepo = owned.length === 1 && newestReleaseAssets.length === 1;
     owned.forEach(p => {
       let vers        = byAsset[p.source.asset];
       let assetName   = p.source.asset;
       let downloadUrl = vers ? vers[0].download_url : null;
 
-      // Fallback: asset filename embeds the version and changed between releases.
-      // Single-payload repo + single-asset release → identify the successor.
-      if (!vers && owned.length === 1 && newestReleaseAssets.length === 1) {
+      if (singlePayloadRepo) {
         const successor = newestReleaseAssets[0];
         vers        = [successor];
         assetName   = successor.asset_name;

@@ -207,21 +207,27 @@ async def api_check_updates():
             if not assets:
                 continue
             latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
-            # Assets that belong to the newest release tag — used as fallback
-            # when the saved asset name no longer matches (e.g. repos that
-            # embed the version into the filename like ShadowMountPlus_X.Y.zip).
             newest_tag = assets[0]["tag"]
             newest_release_assets = [a for a in assets if a["tag"] == newest_tag]
+
+            # Single-payload repo + single asset per release: trust the newest
+            # release as the source of truth, regardless of whether the saved
+            # asset filename still appears in the recent releases. This covers
+            # repos that embed the version into the filename
+            # (ShadowMountPlus_X.Y.zip) where the old name may still be present
+            # in the recent-3 release window.
+            single_payload_repo = (
+                len(filenames) == 1 and len(newest_release_assets) == 1
+            )
+
             for fname in filenames:
                 m          = meta.get(fname, {})
                 current    = m.get("version", "")
                 asset_name = m.get("asset", fname)
-                latest     = latest_per_asset.get(asset_name)
-                if not latest and len(filenames) == 1 and len(newest_release_assets) == 1:
-                    # Single-payload repo with a single asset per release: the
-                    # one asset in the newest release is the successor, even
-                    # if the filename changed.
+                if single_payload_repo:
                     latest = newest_release_assets[0]
+                else:
+                    latest = latest_per_asset.get(asset_name)
                 if not latest:
                     continue
                 if latest["tag"] != current:
