@@ -30,10 +30,16 @@ function renderSourcesList() {
     container.innerHTML = '<div class="empty-state">No sources added yet.</div>';
     return;
   }
+  const updatesByRepo = {};
+  Object.values(state.updateResults || {}).forEach(u => {
+    if (!u.repo) return;
+    (updatesByRepo[u.repo] = updatesByRepo[u.repo] || []).push(u);
+  });
   container.innerHTML = '';
   state.sources.forEach(src => {
+    const updatesForRepo = updatesByRepo[src.repo] || [];
     const el = document.createElement('div');
-    el.className = 'source-item fade';
+    el.className = 'source-item fade' + (updatesForRepo.length ? ' has-updates' : '');
     el.dataset.repo = src.repo;
 
     // ── Main row: info + buttons ─────────────────────────────────
@@ -42,11 +48,23 @@ function renderSourcesList() {
 
     const info = document.createElement('div');
     info.className = 'source-info';
+    const nameRow = document.createElement('div');
+    nameRow.className = 'source-name-row';
     const nameEl = document.createElement('span');
     nameEl.className   = 'source-repo';
     nameEl.textContent = src.display_name || src.repo;
     nameEl.title       = src.repo;
-    info.appendChild(nameEl);
+    nameRow.appendChild(nameEl);
+    if (updatesForRepo.length) {
+      const upBadge = document.createElement('span');
+      upBadge.className = 'source-update-badge';
+      upBadge.textContent = `⚠ ${updatesForRepo.length} update${updatesForRepo.length > 1 ? 's' : ''}`;
+      upBadge.title = updatesForRepo
+        .map(u => `${u.filename}: ${u.current_version} → ${u.latest_version}`)
+        .join('\n');
+      nameRow.appendChild(upBadge);
+    }
+    info.appendChild(nameRow);
     if (src.filter) {
       const filterEl = document.createElement('span');
       filterEl.className = 'source-filter';
@@ -525,9 +543,14 @@ async function checkSourceUpdates(repo, sourceEl) {
       .filter(([name]) => !importedAssets.has(name) && !usedAsUpdate.has(name))
       .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
     _renderUpdateBadge(Object.keys(state.updateResults).length);
+    renderSourcesList();
     if (updatesAvail) renderPayloads();
 
-    if (panel) _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, owned.length);
+    if (panel) {
+      const repoUpdates = Object.values(state.updateResults).filter(u => u.repo === repo);
+      _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, owned.length);
+      panel.style.display = '';
+    }
 
     const parts = [];
     if (newAssets.length) parts.push(`${newAssets.length} new payload(s)`);
@@ -540,8 +563,9 @@ async function checkSourceUpdates(repo, sourceEl) {
   }
 }
 
-function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importedCount) {
+function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, importedCount) {
   panel.innerHTML = '';
+  const updatesAvail = repoUpdates.length;
 
   const statusLine = document.createElement('div');
   const parts = [];
@@ -552,6 +576,52 @@ function _populateSourceCheckPanel(panel, repo, newAssets, updatesAvail, importe
   statusLine.textContent = (hasWarning ? '⚠ ' : '') + parts.join(' · ');
   statusLine.className   = 'source-check-status ' + (hasWarning ? 'warn' : 'ok');
   panel.appendChild(statusLine);
+
+  if (updatesAvail) {
+    const hdr = document.createElement('p');
+    hdr.className   = 'source-check-hdr';
+    hdr.textContent = 'Updates available:';
+    panel.appendChild(hdr);
+
+    const updList = document.createElement('div');
+    updList.className = 'source-check-list';
+
+    repoUpdates.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'source-update-row';
+      const txt = document.createElement('span');
+      txt.className = 'source-update-text';
+      txt.textContent = `${u.filename}: ${u.current_version} → ${u.latest_version}`;
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm btn-primary';
+      btn.textContent = 'Update';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true; btn.textContent = 'Updating…';
+        try {
+          await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              repo: u.repo, asset_name: u.asset_name,
+              download_url: u.download_url, version: u.latest_version,
+            }),
+          });
+          delete state.updateResults[u.filename];
+          showToast(`'${u.filename}' updated to ${u.latest_version}`);
+          await refreshPayloads();
+          renderSourcesList();
+          row.remove();
+          _renderUpdateBadge(Object.keys(state.updateResults).length);
+        } catch (e) {
+          log(`Update '${u.filename}': ${e.message}`, 'error');
+          btn.disabled = false; btn.textContent = 'Update';
+        }
+      });
+      row.appendChild(txt); row.appendChild(btn);
+      updList.appendChild(row);
+    });
+
+    panel.appendChild(updList);
+  }
 
   if (newAssets.length) {
     const hdr = document.createElement('p');
@@ -712,6 +782,7 @@ async function checkAllUpdates() {
     data.updates.forEach(u => { state.updateResults[u.filename] = u; });
     state.updateCheckDone = true;
     _renderUpdateBadge(data.updates.length);
+    renderSourcesList();
     renderPayloads();
   } catch (e) { log('Check updates: ' + e.message, 'error'); }
   finally {
