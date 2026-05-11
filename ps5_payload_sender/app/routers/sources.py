@@ -204,12 +204,24 @@ async def api_check_updates():
         owner, repo_name = parts
         try:
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
+            if not assets:
+                continue
             latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
+            # Assets that belong to the newest release tag — used as fallback
+            # when the saved asset name no longer matches (e.g. repos that
+            # embed the version into the filename like ShadowMountPlus_X.Y.zip).
+            newest_tag = assets[0]["tag"]
+            newest_release_assets = [a for a in assets if a["tag"] == newest_tag]
             for fname in filenames:
                 m          = meta.get(fname, {})
                 current    = m.get("version", "")
                 asset_name = m.get("asset", fname)
                 latest     = latest_per_asset.get(asset_name)
+                if not latest and len(filenames) == 1 and len(newest_release_assets) == 1:
+                    # Single-payload repo with a single asset per release: the
+                    # one asset in the newest release is the successor, even
+                    # if the filename changed.
+                    latest = newest_release_assets[0]
                 if not latest:
                     continue
                 if latest["tag"] != current:
@@ -217,7 +229,8 @@ async def api_check_updates():
                         "filename": fname, "current_version": current,
                         "latest_version": latest["tag"],
                         "download_url": latest["download_url"],
-                        "repo": slug, "asset_name": asset_name,
+                        "repo": slug,
+                        "asset_name": latest["asset_name"],
                     })
         except Exception:
             pass
