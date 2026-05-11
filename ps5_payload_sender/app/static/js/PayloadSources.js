@@ -559,7 +559,23 @@ async function checkSourceUpdates(repo, sourceEl) {
     if (updatesAvail)     parts.push(`${updatesAvail} update(s) available`);
     if (!parts.length)    parts.push('All up to date');
     showToast(parts.join(' · '));
-  } catch (e) { log('Check source: ' + e.message, 'error'); }
+  } catch (e) {
+    log('Check source: ' + e.message, 'error');
+    if (panel) {
+      panel.innerHTML = '';
+      const err = document.createElement('div');
+      err.className = 'source-check-status warn';
+      err.textContent = '⚠ Check failed: ' + e.message;
+      panel.appendChild(err);
+      const closeBtn = document.createElement('button');
+      closeBtn.className   = 'btn btn-sm';
+      closeBtn.textContent = '✕ Close';
+      closeBtn.style.cssText = 'margin-top:.35rem;width:100%';
+      closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+      panel.appendChild(closeBtn);
+      panel.style.display = '';
+    }
+  }
   finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Check'; }
   }
@@ -585,20 +601,67 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
     hdr.textContent = 'Updates available:';
     panel.appendChild(hdr);
 
+    const applyBtn = document.createElement('button');
+    applyBtn.className   = 'btn btn-primary btn-sm';
+    applyBtn.textContent = `Update Selected (0)`;
+    applyBtn.disabled    = true;
+    applyBtn.style.cssText = 'width:100%;margin-top:.4rem';
+
     const updList = document.createElement('div');
     updList.className = 'source-check-list';
+
+    const refreshApplyBtn = () => {
+      const checked = updList.querySelectorAll('input[type=checkbox]:checked');
+      applyBtn.disabled = checked.length === 0;
+      applyBtn.textContent = `Update Selected (${checked.length})`;
+    };
+
+    // Select All / Deselect All bar (only when >1 update)
+    if (repoUpdates.length > 1) {
+      const bar = document.createElement('div');
+      bar.className = 'detected-select-bar detected-select-bar--inline';
+      const saBtn = document.createElement('button');
+      saBtn.className = 'btn btn-xs'; saBtn.textContent = 'Select All';
+      saBtn.addEventListener('click', () => {
+        updList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+        refreshApplyBtn();
+      });
+      const daBtn = document.createElement('button');
+      daBtn.className = 'btn btn-xs'; daBtn.textContent = 'Deselect All';
+      daBtn.addEventListener('click', () => {
+        updList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+        refreshApplyBtn();
+      });
+      bar.appendChild(saBtn); bar.appendChild(daBtn);
+      panel.appendChild(bar);
+    }
 
     repoUpdates.forEach(u => {
       const row = document.createElement('div');
       row.className = 'source-update-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'p-checkbox';
+      cb.checked = true;
+      cb.addEventListener('change', refreshApplyBtn);
       const txt = document.createElement('span');
       txt.className = 'source-update-text';
       txt.textContent = `${u.filename}: ${u.current_version} → ${u.latest_version}`;
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-sm btn-primary';
-      btn.textContent = 'Update';
-      btn.addEventListener('click', async () => {
-        btn.disabled = true; btn.textContent = 'Updating…';
+      row.dataset.filename = u.filename;
+      row.appendChild(cb); row.appendChild(txt);
+      updList.appendChild(row);
+    });
+
+    panel.appendChild(updList);
+
+    applyBtn.addEventListener('click', async () => {
+      const selected = Array.from(updList.querySelectorAll('.source-update-row'))
+        .filter(r => r.querySelector('input[type=checkbox]').checked)
+        .map(r => state.updateResults[r.dataset.filename])
+        .filter(Boolean);
+      if (!selected.length) return;
+      applyBtn.disabled = true; applyBtn.textContent = 'Updating…';
+      let done = 0;
+      for (const u of selected) {
         try {
           await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -608,21 +671,23 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
             }),
           });
           delete state.updateResults[u.filename];
-          showToast(`'${u.filename}' updated to ${u.latest_version}`);
-          await refreshPayloads();
-          renderSourcesList();
-          row.remove();
-          _renderUpdateBadge(Object.keys(state.updateResults).length);
+          const row = updList.querySelector(`.source-update-row[data-filename="${CSS.escape(u.filename)}"]`);
+          if (row) row.remove();
+          done++;
         } catch (e) {
           log(`Update '${u.filename}': ${e.message}`, 'error');
-          btn.disabled = false; btn.textContent = 'Update';
         }
-      });
-      row.appendChild(txt); row.appendChild(btn);
-      updList.appendChild(row);
+      }
+      showToast(`${done} payload(s) updated`);
+      await refreshPayloads();
+      renderSourcesList();
+      _renderUpdateBadge(Object.keys(state.updateResults).length);
+      refreshApplyBtn();
+      if (!updList.querySelectorAll('.source-update-row').length) applyBtn.style.display = 'none';
     });
 
-    panel.appendChild(updList);
+    panel.appendChild(applyBtn);
+    refreshApplyBtn();
   }
 
   if (newAssets.length) {
@@ -809,25 +874,118 @@ function _renderUpdateBadge(count) {
 async function updateAll() {
   const updates = Object.values(state.updateResults || {});
   if (!updates.length) { showToast('Nothing to update'); return; }
-  if (!confirm(`Update ${updates.length} payload(s) to latest versions?`)) return;
-  const btn = document.getElementById('btn-update-all');
-  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
-  let done = 0;
-  for (const u of updates) {
-    try {
-      await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repo: u.repo, asset_name: u.asset_name,
-          download_url: u.download_url, version: u.latest_version,
-        }),
-      });
-      delete state.updateResults[u.filename];
-      done++;
-    } catch (e) { log(`Update '${u.filename}': ${e.message}`, 'error'); }
+  _openUpdateSelectionDialog(updates);
+}
+
+function _openUpdateSelectionDialog(updates) {
+  const existing = document.getElementById('update-selection-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'update-selection-modal';
+  modal.className = 'modal-overlay';
+
+  const card = document.createElement('div');
+  card.className = 'modal-box';
+
+  const title = document.createElement('h3');
+  title.className = 'modal-title';
+  title.textContent = `Select payloads to update (${updates.length})`;
+  card.appendChild(title);
+
+  const list = document.createElement('div');
+  list.className = 'modal-step-list';
+
+  const refreshCount = () => {
+    const checked = list.querySelectorAll('input[type=checkbox]:checked').length;
+    applyBtn.disabled = checked === 0;
+    applyBtn.textContent = `Update ${checked} of ${updates.length}`;
+  };
+
+  // Group by repo for readability
+  const byRepo = {};
+  updates.forEach(u => { (byRepo[u.repo] = byRepo[u.repo] || []).push(u); });
+
+  if (updates.length > 1) {
+    const bar = document.createElement('div');
+    bar.className = 'detected-select-bar detected-select-bar--inline';
+    const saBtn = document.createElement('button');
+    saBtn.className = 'btn btn-xs'; saBtn.textContent = 'Select All';
+    saBtn.addEventListener('click', () => {
+      list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+      refreshCount();
+    });
+    const daBtn = document.createElement('button');
+    daBtn.className = 'btn btn-xs'; daBtn.textContent = 'Deselect All';
+    daBtn.addEventListener('click', () => {
+      list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+      refreshCount();
+    });
+    bar.appendChild(saBtn); bar.appendChild(daBtn);
+    card.appendChild(bar);
   }
-  if (btn) { btn.disabled = false; btn.textContent = '⬆ Update All'; }
-  showToast(`${done} payload(s) updated`);
-  await refreshPayloads();
-  await checkAllUpdates();
+
+  Object.keys(byRepo).sort().forEach(repo => {
+    const repoHdr = document.createElement('div');
+    repoHdr.className = 'source-check-hdr';
+    repoHdr.textContent = repo;
+    list.appendChild(repoHdr);
+    byRepo[repo].forEach(u => {
+      const row = document.createElement('label');
+      row.className = 'source-update-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'p-checkbox'; cb.checked = true;
+      cb.dataset.filename = u.filename;
+      cb.addEventListener('change', refreshCount);
+      const txt = document.createElement('span');
+      txt.className = 'source-update-text';
+      txt.textContent = `${u.filename}: ${u.current_version} → ${u.latest_version}`;
+      row.appendChild(cb); row.appendChild(txt);
+      list.appendChild(row);
+    });
+  });
+  card.appendChild(list);
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'modal-btn-row';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => modal.remove());
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'btn btn-primary btn-sm';
+  applyBtn.textContent = `Update ${updates.length} of ${updates.length}`;
+  applyBtn.addEventListener('click', async () => {
+    const selected = Array.from(list.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => state.updateResults[cb.dataset.filename])
+      .filter(Boolean);
+    if (!selected.length) return;
+    applyBtn.disabled = true; cancelBtn.disabled = true;
+    applyBtn.textContent = 'Updating…';
+    let done = 0;
+    for (const u of selected) {
+      try {
+        await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repo: u.repo, asset_name: u.asset_name,
+            download_url: u.download_url, version: u.latest_version,
+          }),
+        });
+        delete state.updateResults[u.filename];
+        done++;
+      } catch (e) { log(`Update '${u.filename}': ${e.message}`, 'error'); }
+    }
+    modal.remove();
+    showToast(`${done} payload(s) updated`);
+    await refreshPayloads();
+    await checkAllUpdates();
+  });
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(applyBtn);
+  card.appendChild(btnRow);
+
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+  refreshCount();
 }
