@@ -609,9 +609,24 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 }
 .source-main-row { display:flex; align-items:center; gap:.5rem }
 .source-info  { display:flex; flex-direction:column; flex:1; min-width:0; gap:.08rem }
+.source-name-row { display:flex; align-items:center; gap:.4rem; min-width:0 }
 .source-repo  { font-size:.87rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .source-filter{ font-size:.72rem; color:var(--dim) }
 .source-btns  { display:flex; gap:.25rem; flex-shrink:0 }
+
+.source-item.has-updates { border-left:3px solid var(--log-warn) }
+.source-update-badge {
+  font-size:.7rem; font-weight:700; padding:.1rem .35rem;
+  border-radius:var(--r-sm); background:var(--log-warn); color:#111;
+  flex-shrink:0; white-space:nowrap;
+}
+
+.source-update-row {
+  display:flex; align-items:center; gap:.4rem;
+  padding:.3rem .4rem; margin-bottom:.25rem;
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--r-sm);
+}
+.source-update-text { font-size:.78rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis }
 
 /* Per-source check results panel */
 .source-check-panel {
