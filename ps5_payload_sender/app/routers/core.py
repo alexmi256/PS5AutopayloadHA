@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 import aiofiles
 from fastapi import APIRouter, Request
@@ -27,7 +28,18 @@ async def root(request: Request):
     ingress_path = request.headers.get("X-Ingress-Path", "").rstrip("/")
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     inject = f'<script>window.PS5_BASE="{ingress_path}";</script>'
-    return HTMLResponse(content=html.replace("</head>", inject + "\n</head>", 1))
+    html = html.replace("</head>", inject + "\n</head>", 1)
+    # Append ?v=APP_VERSION to all static asset URLs so browsers re-fetch
+    # them after every add-on upgrade (HA OS aggressively caches JS/CSS).
+    html = re.sub(
+        r'(static/(?:js|css)/[^"\']+\.(?:js|css))',
+        rf'\1?v={APP_VERSION}',
+        html,
+    )
+    return HTMLResponse(
+        content=html,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @router.get("/api/version")

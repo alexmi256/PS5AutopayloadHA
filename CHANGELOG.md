@@ -9,6 +9,7 @@
 
 ### UI Improvements
 
+- **Static assets are now cache-busted on every add-on update**: HA OS / mobile browsers aggressively cached `PayloadSources.js` and the other JS/CSS files, so frontend changes were invisible until the user manually hard-reloaded — easy to overlook on iPhone Safari. The `/` endpoint now appends `?v=APP_VERSION` to every `static/js/*.js` and `static/css/*.css` URL and serves the HTML with `Cache-Control: no-cache`. Browsers re-fetch JS/CSS automatically after every version bump.
 - **Multi-select for pending updates** (both per-source panel and global "⬆ Update All"):
   - Per-source panel: each update gets a checkbox, "Update Selected (N)" button at the bottom. "Select All" / "Deselect All" appears when more than one update is pending.
   - Global Update All: opens a modal grouped by repo with checkboxes, all selected by default. Pick which payloads actually receive the new version.
