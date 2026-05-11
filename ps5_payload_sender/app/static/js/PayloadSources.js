@@ -483,28 +483,47 @@ async function checkSourceUpdates(repo, sourceEl) {
       byAsset[r.asset_name].push(r);
     });
 
-    const owned         = state.payloads.filter(p => p.source && p.source.repo === repo);
+    // Releases come newest-first → first item's tag is the newest release.
+    const newestTag = data.releases[0]?.tag || null;
+    const newestReleaseAssets = data.releases.filter(r => r.tag === newestTag);
+
+    const owned          = state.payloads.filter(p => p.source && p.source.repo === repo);
     const importedAssets = new Set(owned.map(p => p.source.asset));
-    const newAssets = Object.entries(byAsset)
-      .filter(([name]) => !importedAssets.has(name))
-      .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
+    const usedAsUpdate   = new Set();
 
     if (!state.updateResults) state.updateResults = {};
     let updatesAvail = 0;
     owned.forEach(p => {
-      const vers = byAsset[p.source.asset];
+      let vers        = byAsset[p.source.asset];
+      let assetName   = p.source.asset;
+      let downloadUrl = vers ? vers[0].download_url : null;
+
+      // Fallback: asset filename embeds the version and changed between releases.
+      // Single-payload repo + single-asset release → identify the successor.
+      if (!vers && owned.length === 1 && newestReleaseAssets.length === 1) {
+        const successor = newestReleaseAssets[0];
+        vers        = [successor];
+        assetName   = successor.asset_name;
+        downloadUrl = successor.download_url;
+        usedAsUpdate.add(assetName);
+      }
+
       if (vers && vers[0].tag !== p.source.version) {
         updatesAvail++;
         state.updateResults[p.name] = {
           filename:        p.name,
           repo:            p.source.repo,
-          asset_name:      p.source.asset,
+          asset_name:      assetName,
           current_version: p.source.version,
           latest_version:  vers[0].tag,
-          download_url:    vers[0].download_url,
+          download_url:    downloadUrl,
         };
       }
     });
+
+    const newAssets = Object.entries(byAsset)
+      .filter(([name]) => !importedAssets.has(name) && !usedAsUpdate.has(name))
+      .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
     _renderUpdateBadge(Object.keys(state.updateResults).length);
     if (updatesAvail) renderPayloads();
 

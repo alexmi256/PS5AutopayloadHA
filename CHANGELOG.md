@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 
+- **Update check missed repos with versioned asset names** (e.g. drakmor/ShadowMountPlus where the release asset is `ShadowMountPlus_1.6test8-fix1.zip`): both `/api/sources/check-updates` and the per-source "↻ Check" button matched releases by asset filename. When the filename embedded the version, every release had a different asset name, so the saved name never matched the newest release and no update was reported. Fallback added: when a repo has a single tracked payload and the newest release contains a single asset, that asset is treated as the successor regardless of filename. New asset names in the result use the updated filename so the follow-up switch-version call works.
 - **"Check Updates" inconsistent with per-source "Check"**: the global update check ignored a newer GitHub release if its tag already existed in the local `versions[]` history (e.g. after rolling back to an older version), while the per-source Check button still reported the update. Both checks now use the same rule — an update is reported whenever the active version is not the latest GitHub release.
 
 ## [1.1.1] – 2026-04-19
