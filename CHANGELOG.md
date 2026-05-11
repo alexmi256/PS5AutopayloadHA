@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **"Check Updates" inconsistent with per-source "Check"**: the global update check ignored a newer GitHub release if its tag already existed in the local `versions[]` history (e.g. after rolling back to an older version), while the per-source Check button still reported the update. Both checks now use the same rule — an update is reported whenever the active version is not the latest GitHub release.
+
 ## [1.1.1] – 2026-04-19
 
 ### New Features
