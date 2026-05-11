@@ -4,6 +4,7 @@
 
 ### Bug Fixes (continued)
 
+- **Per-source "↻ Check" silently did nothing on failed requests**: when `/api/sources/releases` returned an error (e.g. 502 because a repo has no releases or because GitHub rate-limited the request), the frontend swallowed the exception and left the panel hidden — users got no visible feedback at all. The panel is now opened with the error message so the cause is visible.
 - **Global "Check Updates" still missed single-payload repos with versioned filenames** when the old asset name was still present in the 3 most recent releases (e.g. ShadowMountPlus where `1.6test8-fix1` was still in the recent-3 window alongside `1.6beta10`). The asset-name match found the old release, compared the tag to current, decided "no update" — even though a newer release tag existed. Both global and per-source checks now follow the same rule for single-payload repos: trust the newest release as the successor regardless of filename match.
 
 ### UI Improvements

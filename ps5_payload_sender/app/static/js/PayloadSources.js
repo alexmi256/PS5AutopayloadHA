@@ -559,7 +559,23 @@ async function checkSourceUpdates(repo, sourceEl) {
     if (updatesAvail)     parts.push(`${updatesAvail} update(s) available`);
     if (!parts.length)    parts.push('All up to date');
     showToast(parts.join(' · '));
-  } catch (e) { log('Check source: ' + e.message, 'error'); }
+  } catch (e) {
+    log('Check source: ' + e.message, 'error');
+    if (panel) {
+      panel.innerHTML = '';
+      const err = document.createElement('div');
+      err.className = 'source-check-status warn';
+      err.textContent = '⚠ Check failed: ' + e.message;
+      panel.appendChild(err);
+      const closeBtn = document.createElement('button');
+      closeBtn.className   = 'btn btn-sm';
+      closeBtn.textContent = '✕ Close';
+      closeBtn.style.cssText = 'margin-top:.35rem;width:100%';
+      closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+      panel.appendChild(closeBtn);
+      panel.style.display = '';
+    }
+  }
   finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Check'; }
   }
