@@ -465,24 +465,47 @@ body {
 .step-wait-loader { background:rgba(245,158,11,.15);  color:var(--warn)    }
 .step-notify      { background:rgba(99,102,241,.18);  color:var(--primary) }
 
-/* Per-flow notify config inside the builder */
+/* Per-flow notify config inside the builder.
+   The whole <details> reads as a button when collapsed (primary-tinted
+   background, hover state, chevron) so users see it's tappable. When
+   open it relaxes into a normal panel so the form fields take focus. */
 .flow-notify-block {
   margin:.6rem 0 .4rem;
-  background:var(--bg-soft); border:1px solid var(--border);
-  border-radius:var(--r-sm); padding:.45rem .65rem;
+  background:var(--pri-soft); border:1px solid var(--primary);
+  border-radius:var(--r-sm); padding:.4rem .65rem;
+  transition:background .12s, border-color .12s;
+}
+.flow-notify-block[open] {
+  background:var(--bg-soft); border-color:var(--border);
+  padding:.45rem .65rem;
 }
 .flow-notify-block > summary {
-  cursor:pointer; font-weight:600; font-size:.85rem;
-  color:var(--text); padding:.15rem 0;
+  cursor:pointer; font-weight:600; font-size:.88rem;
+  color:var(--primary); padding:.2rem 0;
   list-style:none;
+  display:flex; align-items:center; gap:.4rem;
 }
+.flow-notify-block[open] > summary { color:var(--text) }
+.flow-notify-block > summary:hover { filter:brightness(1.15) }
 .flow-notify-block > summary::-webkit-details-marker { display:none }
 .flow-notify-block > summary::before {
-  content:'▸ '; color:var(--muted); display:inline-block;
+  /* Bell icon in SVG so it picks up currentColor and doesn't depend
+     on an icon font being loaded. */
+  content:'';
+  width:1rem; height:1rem; flex-shrink:0;
+  background-color:currentColor;
+  mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/></svg>");
+  -webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/></svg>");
+  mask-size:contain; -webkit-mask-size:contain;
+  mask-repeat:no-repeat; -webkit-mask-repeat:no-repeat;
+}
+.flow-notify-block > summary::after {
+  content:'▸';
+  margin-left:auto; color:currentColor; font-size:.85rem;
   transition:transform .15s ease;
 }
-.flow-notify-block[open] > summary::before { content:'▾ '; }
-.flow-notify-body { margin-top:.45rem }
+.flow-notify-block[open] > summary::after { transform:rotate(90deg); }
+.flow-notify-body { margin-top:.55rem }
 
 .input-error { border-color:var(--danger) !important }
 
@@ -990,7 +1013,6 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 /* ---- Mobile scaling fixes ---- */
 @media (max-width: 480px) {
   .header { padding: .35rem .7rem }
-  .header-adv-label { display: none }
   .header-actions { gap: .22rem }
 
   /* Header row 2 (subtitle + version + actions) gets too tight on
@@ -999,6 +1021,17 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   .header-row-sub { flex-direction: column; align-items: stretch; gap: .3rem }
   .header-row-sub .header-meta { justify-content: space-between }
   .header-row-sub .header-actions { justify-content: flex-end; flex-wrap: wrap }
+
+  /* Now that the header has room for two rows, keep the "Advanced"
+     label visible AND give the toggle a chip-style background so it
+     reads as a tappable control instead of a stray pill. */
+  .header-adv-toggle {
+    border:1px solid var(--border); border-right:1px solid var(--border);
+    background:var(--card-hi);
+    padding:.18rem .5rem; border-radius:999px;
+    margin-right:.1rem;
+  }
+  .header-adv-label { display: inline; font-size:.72rem }
 
   .main { padding: .65rem }
   .card { padding: .75rem .85rem }
@@ -1022,9 +1055,10 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   .source-btns     { justify-content: flex-end; flex-wrap: wrap }
   .source-btns .btn { flex: 1 1 auto; min-width: 0 }
 
-  /* Saved Flows: same idea — name on its own line, buttons below.
-     Pin-to-quick-start button gets cramped otherwise. */
-  .profile-item    { flex-wrap: wrap; row-gap: .35rem }
+  /* Saved Flows: name on its own line, action buttons wrap below
+     and pin to the right edge so the eye lands on them straight
+     from the name. */
+  .profile-item    { flex-wrap: wrap; row-gap: .35rem; justify-content: flex-end }
   .profile-name    { flex: 1 1 100%; min-width: 0 }
 
   /* Quick Start tiles: allow smaller */
