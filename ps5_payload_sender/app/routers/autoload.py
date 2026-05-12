@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
+from atomic_write import atomic_write_text
 from autoload_parser import (
     DelayDirective,
     SendDirective,
@@ -54,7 +55,7 @@ async def api_save_profile(req: SaveProfileRequest):
     safe = Path(req.profile).name
     if not safe.endswith(".txt"):
         raise HTTPException(400, "Only .txt files allowed")
-    (PROFILES_DIR / safe).write_text(req.content, encoding="utf-8")
+    atomic_write_text(PROFILES_DIR / safe, req.content)
     await manager.status(f"Profile '{safe}' saved", level="success")
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(executor, write_ha_services_yaml)
@@ -108,7 +109,7 @@ async def api_patch_flow_versions(profile: str, req: PatchFlowVersionsRequest):
         raise HTTPException(404, "Profile not found")
     content = p.read_text(encoding="utf-8", errors="replace")
     content = set_version_pin(content, req.filename, req.version)
-    p.write_text(content, encoding="utf-8")
+    atomic_write_text(p, content)
     return {"ok": True}
 
 

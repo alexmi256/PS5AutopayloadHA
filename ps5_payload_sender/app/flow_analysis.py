@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
+from atomic_write import atomic_write_text
 from config import FLOW_RUNS_FILE, MAX_FLOW_RUNS
 
 
@@ -26,7 +27,7 @@ def _load() -> List[Dict[str, Any]]:
 
 def _save(runs: list) -> None:
     FLOW_RUNS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    FLOW_RUNS_FILE.write_text(json.dumps(runs, indent=2), encoding="utf-8")
+    atomic_write_text(FLOW_RUNS_FILE, json.dumps(runs, indent=2))
 
 
 def record_run(run: Dict[str, Any]) -> None:

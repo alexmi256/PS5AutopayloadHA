@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from atomic_write import atomic_write_text
 from config import MAX_TIMING_ENTRIES, TIMING_FILE
 
 _log = logging.getLogger("ps5_autopayload")
@@ -30,7 +31,7 @@ def _load() -> Dict[str, List[dict]]:
 
 
 def _save(data: Dict[str, List[dict]]) -> None:
-    TIMING_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(TIMING_FILE, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 # ── Public API ────────────────────────────────────────────────────

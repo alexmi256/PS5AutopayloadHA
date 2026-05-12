@@ -5,9 +5,9 @@ import hashlib
 import shutil
 from pathlib import Path
 
-import aiofiles
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from atomic_write import atomic_write_bytes
 from config import ALLOWED_PAYLOAD_EXTENSIONS, HIDDEN_PROFILES, PAYLOAD_DIR, PROFILES_DIR
 from exec_engine import executor
 from github_client import download_payload as gh_download_payload
@@ -43,8 +43,8 @@ async def api_upload(file: UploadFile = File(...)):
     if ext not in ALLOWED_PAYLOAD_EXTENSIONS:
         raise HTTPException(400, f"Type '{ext}' not allowed — only .lua and .elf files")
     content = await file.read()
-    async with aiofiles.open(PAYLOAD_DIR / safe, "wb") as f:
-        await f.write(content)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, atomic_write_bytes, PAYLOAD_DIR / safe, content)
     await manager.status(f"'{safe}' uploaded ({len(content)} bytes)", level="success")
     return {"success": True, "filename": safe, "size": len(content), "auto_port": resolve_port(safe)}
 
@@ -78,7 +78,7 @@ async def api_import_payload(req: ImportPayloadRequest):
     if Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
         raise HTTPException(400, "Only .elf and .lua files allowed")
     payload_hash = hashlib.sha256(data).hexdigest()
-    (PAYLOAD_DIR / safe).write_bytes(data)
+    atomic_write_bytes(PAYLOAD_DIR / safe, data)
     meta = load_payload_meta()
     existing = meta.get(safe, {})
     existing_versions = existing.get("versions", [])
@@ -123,7 +123,7 @@ async def api_switch_version(filename: str, req: SwitchVersionRequest):
         )
     except Exception as exc:
         raise HTTPException(502, f"Download failed: {exc}")
-    dest.write_bytes(data)
+    atomic_write_bytes(dest, data)
     meta = load_payload_meta()
     existing = meta.get(safe) or {}
     existing_versions = existing.get("versions", [])

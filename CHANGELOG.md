@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Internal
+
+- **Crash-safe writes for every persistent config file**: every `Path.write_text(...)` / `write_bytes(...)` call on user-critical files (`sources.json`, `devices.json`, `state.json`, `payload_meta.json`, `flow_runs.json`, `port_timing.json`, `pre_restore_backup.json`, the imported/exported backup JSONs, every profile `.txt` and every imported payload `.elf` / `.lua`) now goes through a small `atomic_write` helper that writes to a sibling `.tmp` file first and then `os.replace`-es it onto the target. Previously, an OOM-kill or SD-card power loss mid-write left a truncated/half-written file and the user lost their entire add-on configuration. With the atomic pattern, a reader will always see either the previous valid file or the new valid file, never a partial one. New: `app/atomic_write.py` + `tests/test_atomic_write.py`.
+
 ### Bug Fixes (continued)
 
 - **Per-source "↻ Check" panel never appeared in 1.1.1-dev**: clicking ↻ Check showed only a toast — the result panel that 1.1.1 opens below the source stayed hidden. Cause: the new highlight-affected-sources feature added a `renderSourcesList()` call inside `checkSourceUpdates`, which rebuilds every `.source-item` from scratch. The `panel` reference captured before that call was then a detached DOM node, so populating it and setting `display=''` had no visible effect. The panel is now re-queried after `renderSourcesList()` runs (in both the success and error paths) before being shown.
