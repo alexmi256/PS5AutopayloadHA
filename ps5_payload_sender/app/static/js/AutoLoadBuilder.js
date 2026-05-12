@@ -57,10 +57,28 @@ function handleBuilderStepStatus(msg) {
 
 function updateStepStatusBadges() {
   Object.entries(_stepRunStatus).forEach(([idx, status]) => {
-    const el = document.querySelector(`.builder-step[data-step-idx="${idx}"] .step-run-status`);
-    if (!el) return;
-    el.className = `step-run-status step-${status}`;
-    el.textContent = status === 'running' ? '⏳' : status === 'done' ? '✔' : '✗';
+    const stepEl = document.querySelector(`.builder-step[data-step-idx="${idx}"]`);
+    if (!stepEl) return;
+    const el = stepEl.querySelector('.step-run-status');
+    if (el) {
+      el.className = `step-run-status step-${status}`;
+      el.textContent = status === 'running' ? '⏳' : status === 'done' ? '✔' : '✗';
+    }
+    // Live wait-for-loader overlay: on terminal status, finalise the
+    // overlay text since the WS poll stream just stopped.
+    const live = stepEl.querySelector('.step-wait-live');
+    if (live && status === 'error') {
+      live.className = 'step-wait-live active timeout';
+      live.innerHTML = `<span class="step-wait-icon">❌</span>
+        <span class="step-wait-text">Timeout — loader was not detected in time</span>`;
+    } else if (live && status === 'done') {
+      live.className = 'step-wait-live active reachable';
+      // Keep the last "reachable" body the WS handler left, or fall back
+      if (!live.innerHTML.trim()) {
+        live.innerHTML = `<span class="step-wait-icon">✅</span>
+          <span class="step-wait-text">Loader detected</span>`;
+      }
+    }
   });
 }
 
@@ -70,6 +88,8 @@ function clearStepRunStatus() {
   document.querySelectorAll('.step-run-status').forEach(el => {
     el.className = 'step-run-status'; el.textContent = '';
   });
+  // Don't wipe step-wait-live overlays — they're useful as run history
+  // until the next flow starts. Per-render they get re-created anyway.
 }
 
 // ── Run/Stop button state ─────────────────────────────────────────
@@ -635,6 +655,14 @@ function _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns) {
     if (v >= 1) { builder.steps[idx].stability_count = v; scheduleSave(); }
   }));
   stepEl.appendChild(adv);
+
+  // Live progress overlay — populated by flow_wait_check WS events while the
+  // flow is paused on this step. Empty when idle so it takes no vertical
+  // space; gets the .active class once we start receiving polls.
+  const live = document.createElement('div');
+  live.className = 'step-wait-live';
+  live.dataset.port = String(step.port);   // used by handler to match poll msgs
+  stepEl.appendChild(live);
 }
 
 function _buildNotifyStep(step, idx, stepEl, mainRow, btns) {
@@ -717,6 +745,46 @@ function builderRenderList() {
     container.appendChild(stepEl);
   });
   if (typeof updateBuilderSummary === 'function') updateBuilderSummary();
+}
+
+// ── Preset: P2JB / Patience flow ─────────────────────────────────
+// Drops a complete, opinionated template into the builder so the
+// user can see what a typical P2JB flow looks like and tweak it.
+// The placeholder filenames may not exist in their payload library —
+// the user replaces them with whatever kstuff / sm+ build they have.
+function builderLoadP2JBPreset() {
+  if (builder.steps.length && !confirm(
+    'This replaces the current builder content with the P2JB template. Continue?'
+  )) return;
+  builder.steps = [
+    { type: 'wait_for_loader', port: 9021, max_wait_s: 10800, interval_s: 30, stability_count: 1 },
+    { type: 'notify',  title: 'Loader ready',    message: '', service_override: '' },
+    { type: 'payload', filename: 'kstuff.elf', autoPort: 9021, portOverride: null, version: null },
+    { type: 'delay',   ms: 1000 },
+    { type: 'payload', filename: 'shadowmountplus.elf', autoPort: 9021, portOverride: null, version: null },
+    { type: 'notify',  title: 'Flow completed', message: '', service_override: '' },
+  ];
+  // Set sensible notify defaults for a P2JB flow if the helper exists.
+  if (typeof flowNotifyApplyConfig === 'function') {
+    flowNotifyApplyConfig({
+      loader_ready:   true,
+      flow_started:   false,
+      flow_completed: true,
+      flow_failed:    true,
+      service:        '',
+    });
+  }
+  // Suggest a name if none yet
+  const nameEl = document.getElementById('builder-profile-name');
+  if (nameEl && !nameEl.value.trim()) nameEl.value = 'P2JB Autoload';
+
+  builderRenderList();
+  scheduleSave();
+  if (typeof log === 'function') {
+    log('P2JB template loaded — replace kstuff.elf / shadowmountplus.elf with the payloads you have.', 'info');
+  }
+  // Scroll to the steps so the user sees what was created
+  document.getElementById('builder-steps')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function builderMoveStep(idx, dir) {

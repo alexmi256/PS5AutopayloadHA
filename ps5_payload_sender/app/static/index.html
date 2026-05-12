@@ -237,12 +237,20 @@
       </div>
       <div class="collapse-body">
 
+        <div class="builder-presets">
+          <button id="btn-preset-p2jb" class="btn btn-sm btn-secondary"
+            title="Insert a ready-made template for a P2JB / Patience flow you can then tweak.">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M3 12h18"/><circle cx="12" cy="12" r="10"/></svg>
+            Create P2JB Flow
+          </button>
+        </div>
+
         <div class="builder-add-btns">
           <button id="btn-add-payload" class="btn btn-sm btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Payload</button>
           <button id="btn-add-delay"   class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Delay</button>
           <button id="btn-add-wait"    class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait Port</button>
-          <button id="btn-add-wait-loader" class="btn btn-sm" title="Long P2JB / Patience wait — fires loader-ready notification and fails on timeout"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait for Loader</button>
-          <button id="btn-add-notify"  class="btn btn-sm" title="Fire a free-form notification inline"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Notify</button>
+          <button id="btn-add-wait-loader" class="btn btn-sm" title="Pauses the flow until the PS5 ELF loader becomes reachable. Used for long-running exploits like P2JB / Patience."><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait for Loader</button>
+          <button id="btn-add-notify"  class="btn btn-sm advanced-only" title="Fire a free-form notification inline. Most users don't need this — the flow already fires automatic notifications for loader-ready, completion, and timeout."><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Notify</button>
         </div>
 
         <!-- Payload panel -->
@@ -302,36 +310,50 @@
 
         <!-- Wait-for-loader panel -->
         <div id="panel-wait-loader" class="add-panel" style="display:none">
-          <div class="field-group">
-            <label class="field-label" for="panel-wfl-port">ELF loader port</label>
-            <input type="number" id="panel-wfl-port" class="input" value="9021" min="1" max="65535" />
-          </div>
-          <div class="p2jb-grid">
-            <div class="field-group">
-              <label class="field-label" for="panel-wfl-max">Max wait (min)</label>
-              <input type="number" id="panel-wfl-max" class="input" value="180" min="1" max="1440" />
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="panel-wfl-iv">Check every (s)</label>
-              <input type="number" id="panel-wfl-iv"  class="input" value="30" min="1" max="600" />
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="panel-wfl-stab">Stability count</label>
-              <input type="number" id="panel-wfl-stab" class="input" value="1" min="1" max="10" />
-            </div>
-          </div>
-          <p class="qs-subtitle" style="margin:.3rem 0 .5rem">
-            Use this step for the long P2JB / Patience wait. On timeout
-            the flow fails and a failure notification is fired.
+          <p class="step-help">
+            <strong>Pauses the flow until the PS5 ELF loader becomes reachable.</strong><br>
+            Used for long-running exploits like <em>P2JB / Patience</em>. Start the
+            exploit on the console — this step blocks the flow until the loader
+            port answers, then continues to your payloads automatically. On
+            timeout the flow fails and a failure notification fires.
           </p>
-          <div class="row-gap">
-            <button id="btn-panel-wfl-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
+          <div class="step-help-typical">
+            <span class="step-help-typical-label">Typical order:</span>
+            <span class="step-help-flow">Exploit trigger → <strong>WAIT FOR LOADER</strong> → payload chain</span>
+          </div>
+
+          <div class="field-group" style="margin-top:.55rem">
+            <label class="field-label" for="panel-wfl-port">ELF Loader Port (default: 9021)</label>
+            <input type="number" id="panel-wfl-port" class="input" value="9021" min="1" max="65535" />
+            <small class="field-hint">Most users should never change this.</small>
+          </div>
+
+          <details class="wait-adv-details">
+            <summary class="wait-adv-summary">Advanced options</summary>
+            <div class="p2jb-grid wait-adv-body">
+              <div class="field-group">
+                <label class="field-label" for="panel-wfl-max">Max wait (min)</label>
+                <input type="number" id="panel-wfl-max" class="input" value="180" min="1" max="1440" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="panel-wfl-iv">Check every (s)</label>
+                <input type="number" id="panel-wfl-iv"  class="input" value="30" min="1" max="600" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="panel-wfl-stab">Stability count</label>
+                <input type="number" id="panel-wfl-stab" class="input" value="1" min="1" max="10" />
+              </div>
+            </div>
+          </details>
+
+          <div class="row-gap" style="margin-top:.5rem">
+            <button id="btn-panel-wfl-ok" class="btn btn-primary btn-sm" style="flex:1">Add step</button>
             <button id="btn-panel-wfl-x"  class="btn btn-sm">Close</button>
           </div>
         </div>
 
-        <!-- Notify panel -->
-        <div id="panel-notify" class="add-panel" style="display:none">
+        <!-- Notify panel (Advanced Mode only — most users don't need this) -->
+        <div id="panel-notify" class="add-panel advanced-only" style="display:none">
           <div class="field-group">
             <label class="field-label" for="panel-notify-title">Title</label>
             <input type="text" id="panel-notify-title" class="input" placeholder="e.g. Loader ready" />
@@ -358,10 +380,10 @@
           <div class="flow-notify-body">
             <div class="field-label">Notify when</div>
             <div class="p2jb-notif-grid">
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-ready"     checked /> Loader ready</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-started"          /> Flow started</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Flow completed</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-failed"    checked /> Flow failed / timeout</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-ready"     checked /> Notify when loader becomes ready</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Notify when flow finishes</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-failed"    checked /> Notify on timeout / failure</label>
+              <label class="checkbox-label advanced-only"><input type="checkbox" id="flow-notify-started" /> Notify when flow starts (advanced)</label>
             </div>
             <div class="field-group" style="margin-top:.5rem">
               <label class="field-label" for="flow-notify-service">
