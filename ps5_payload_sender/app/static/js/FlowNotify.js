@@ -99,9 +99,12 @@ function handleFlowNotifyEvent(msg) {
 // ─── Test buttons ────────────────────────────────────────────────
 function _flowTestBody(extra = {}) {
   const builderName = (document.getElementById('builder-profile-name')?.value || '').trim();
+  const hostEl = document.getElementById('ps5-ip');
   return {
     notify: flowNotifyReadConfig(),
-    host:   getHost ? getHost() : '',
+    // Read IP directly — getHost() would alert() if empty, but the test
+    // buttons don't need an IP to validate notification routing.
+    host:   (hostEl?.value || '').trim(),
     port:   9021,
     flow_name: builderName,
     ...extra,
