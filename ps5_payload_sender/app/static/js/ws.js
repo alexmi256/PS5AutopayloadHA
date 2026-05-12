@@ -48,5 +48,10 @@ function handleWS(msg) {
   if (msg.type === 'status') {
     log(msg.message, msg.level || 'info');
     handleBuilderStepStatus(msg);
+    return;
+  }
+  if (msg.type === 'p2jb_state' || msg.type === 'p2jb_check') {
+    if (typeof handleP2JBEvent === 'function') handleP2JBEvent(msg);
+    return;
   }
 }
