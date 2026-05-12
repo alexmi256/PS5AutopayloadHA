@@ -50,8 +50,8 @@ function handleWS(msg) {
     handleBuilderStepStatus(msg);
     return;
   }
-  if (msg.type === 'p2jb_state' || msg.type === 'p2jb_check') {
-    if (typeof handleP2JBEvent === 'function') handleP2JBEvent(msg);
+  if (msg.type === 'flow_wait_check' || msg.type === 'flow_simulation') {
+    if (typeof handleFlowNotifyEvent === 'function') handleFlowNotifyEvent(msg);
     return;
   }
 }

@@ -3,20 +3,32 @@ Autoload file parser for PS5 Payload Sender.
 
 Syntax (one directive per line):
   # comment                          – ignored
+  # ~version <file> <tag>            – pin payload version
+  # ~notify k=v k=v ...              – per-flow notification settings
+                                       (loader_ready=on flow_started=off
+                                        flow_completed=on flow_failed=on
+                                        service=notify.mobile_app_phone)
   filename.lua [port]                – send payload (port optional)
   filename.elf [port]                – send payload (port optional)
   !<ms>                              – delay in milliseconds
-  ?<port>                            – wait until port is reachable
-  ?<port> <timeout_seconds>          – wait with custom timeout
-  ?<port> <timeout_seconds> <interval_ms>  – wait with custom timeout and poll interval
+  ?<port>                            – wait until port is reachable (short wait)
+  ?<port> <timeout_s>                – wait_port with custom timeout
+  ?<port> <timeout_s> <interval_ms>  – wait_port with custom timeout & poll interval
+  ??<port>                           – WAIT FOR LOADER, defaults 3 h / 30 s / 1 sample
+  ??<port> <max_wait_s>              – long-form wait with custom max
+  ??<port> <max_wait_s> <interval_s>
+  ??<port> <max_wait_s> <interval_s> <stability_count>
+  @notify "<title>" "<message>"      – emit notification using flow's service
+  @notify "<title>" "<message>" notify.<override>
 """
 
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 
 @dataclass
@@ -37,7 +49,36 @@ class WaitPortDirective:
     interval_ms: int = 500   # poll interval in milliseconds
 
 
-Directive = Union[SendDirective, DelayDirective, WaitPortDirective]
+@dataclass
+class WaitForLoaderDirective:
+    """Long-running wait for the P2JB / Patience ELF loader port.
+
+    Differences from :class:`WaitPortDirective`:
+      * defaults tuned for multi-hour waits (3 h max, 30 s poll)
+      * requires N consecutive successful polls before continuing
+      * timeout makes the whole flow FAIL and fires a failure notification
+      * success fires the loader-ready notification
+    """
+    port: int = 9021
+    max_wait_seconds: float = 10800.0
+    interval_seconds: float = 30.0
+    stability_count: int = 1
+
+
+@dataclass
+class NotifyDirective:
+    """Manually placed notification step. Always sends via the flow's
+    configured notify config; ``service_override`` (if set) overrides
+    only the notify.<service> target for this one event."""
+    title: str
+    message: str = ""
+    service_override: Optional[str] = None
+
+
+Directive = Union[
+    SendDirective, DelayDirective, WaitPortDirective,
+    WaitForLoaderDirective, NotifyDirective,
+]
 
 _PAYLOAD_RE = re.compile(
     r'^(?P<name>.+?\.(lua|elf))\s*(?P<port>\d+)?$',
@@ -45,6 +86,7 @@ _PAYLOAD_RE = re.compile(
 )
 
 _VERSION_PIN_RE = re.compile(r'^#\s*~version\s+(\S+)\s+(\S+)\s*$')
+_NOTIFY_HDR_RE  = re.compile(r'^#\s*~notify\s+(.*)$')
 
 
 def parse_version_pins(content: str) -> dict:
@@ -75,6 +117,81 @@ def set_version_pin(content: str, filename: str, version: str) -> str:
     return ''.join(lines) + pin_line + '\n'
 
 
+# ── Notify config header ──────────────────────────────────────────
+
+_DEFAULT_NOTIFY_CONFIG: Dict[str, Any] = {
+    "loader_ready":   True,
+    "flow_started":   False,
+    "flow_completed": True,
+    "flow_failed":    True,
+    "service":        "",          # empty = persistent_notification only
+}
+
+
+def _coerce_bool(val: str) -> bool:
+    return val.strip().lower() in ("1", "true", "on", "yes", "y")
+
+
+def parse_notify_config(content: str) -> Dict[str, Any]:
+    """Read the first ``# ~notify k=v k=v …`` header in *content*.
+
+    Missing keys fall back to :data:`_DEFAULT_NOTIFY_CONFIG`. Unknown keys
+    are ignored. Returns a fresh dict (safe to mutate)."""
+    cfg = dict(_DEFAULT_NOTIFY_CONFIG)
+    for line in content.splitlines():
+        m = _NOTIFY_HDR_RE.match(line.strip())
+        if not m:
+            continue
+        try:
+            tokens = shlex.split(m.group(1))
+        except ValueError:
+            continue
+        for tok in tokens:
+            if "=" not in tok:
+                continue
+            k, _, v = tok.partition("=")
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            if k == "service":
+                cfg["service"] = v
+            elif k in cfg:
+                cfg[k] = _coerce_bool(v)
+        break  # only the first header counts
+    return cfg
+
+
+def render_notify_config(cfg: Dict[str, Any]) -> str:
+    """Render a notify config dict as a single ``# ~notify …`` line."""
+    parts = []
+    for key in ("loader_ready", "flow_started", "flow_completed", "flow_failed"):
+        parts.append(f"{key}={'on' if cfg.get(key) else 'off'}")
+    svc = (cfg.get("service") or "").strip()
+    if svc:
+        parts.append(f'service="{svc}"')
+    return "# ~notify " + " ".join(parts)
+
+
+def set_notify_config(content: str, cfg: Dict[str, Any]) -> str:
+    """Replace (or insert) the first ``# ~notify …`` header in *content*."""
+    line_out = render_notify_config(cfg)
+    lines = content.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if _NOTIFY_HDR_RE.match(line.strip()):
+            lines[i] = line_out + ('\n' if line.endswith('\n') else '')
+            return ''.join(lines)
+    # Not found: insert at the top (after a leading shebang-style comment if any)
+    insert_at = 0
+    if lines and lines[0].lstrip().startswith('#') and '~' not in lines[0]:
+        insert_at = 1
+    lines.insert(insert_at, line_out + '\n')
+    return ''.join(lines)
+
+
+# ── Directive parsing ─────────────────────────────────────────────
+
+_NOTIFY_CALL_RE = re.compile(r'^@notify\b\s*(.*)$', re.IGNORECASE)
+
+
 def parse_line(line: str) -> Optional[Directive]:
     line = line.strip()
     if not line or line.startswith('#'):
@@ -86,6 +203,34 @@ def parse_line(line: str) -> Optional[Directive]:
         except ValueError:
             return None
         return DelayDirective(milliseconds=max(0, ms))
+
+    # ?? must be checked BEFORE ? so the long form wins.
+    if line.startswith('??'):
+        rest = line[2:].strip().split()
+        if not rest:
+            return None
+        try:
+            port = int(rest[0])
+        except ValueError:
+            return None
+        max_wait = 10800.0
+        interval = 30.0
+        stability = 1
+        if len(rest) >= 2:
+            try: max_wait = float(rest[1])
+            except ValueError: pass
+        if len(rest) >= 3:
+            try: interval = max(1.0, float(rest[2]))
+            except ValueError: pass
+        if len(rest) >= 4:
+            try: stability = max(1, int(rest[3]))
+            except ValueError: pass
+        return WaitForLoaderDirective(
+            port=port,
+            max_wait_seconds=max_wait,
+            interval_seconds=interval,
+            stability_count=stability,
+        )
 
     if line.startswith('?'):
         rest = line[1:].strip().split()
@@ -108,6 +253,23 @@ def parse_line(line: str) -> Optional[Directive]:
             except ValueError:
                 pass
         return WaitPortDirective(port=port, timeout_seconds=timeout, interval_ms=interval_ms)
+
+    m_notify = _NOTIFY_CALL_RE.match(line)
+    if m_notify:
+        try:
+            args = shlex.split(m_notify.group(1))
+        except ValueError:
+            return None
+        if not args:
+            return None
+        title = args[0]
+        message = args[1] if len(args) >= 2 else ""
+        # The third positional is treated as a service override only if it
+        # looks like a notify.<svc> token. Otherwise it folds into message.
+        service: Optional[str] = None
+        if len(args) >= 3 and args[2].startswith("notify."):
+            service = args[2]
+        return NotifyDirective(title=title, message=message, service_override=service)
 
     m = _PAYLOAD_RE.match(line)
     if m:
