@@ -19,6 +19,21 @@ from storage import load_payload_meta, load_sources, save_payload_meta, save_sou
 router = APIRouter()
 
 
+async def _run_gh(fn, *args):
+    """Run a blocking github_client call in the executor and translate the
+    common urllib errors into HTTPException. Keeps the three /api/sources
+    handlers free of repeated boilerplate."""
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(executor, fn, *args)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise HTTPException(404, "Repository not found")
+        raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
+    except Exception as exc:
+        raise HTTPException(502, f"Could not reach GitHub: {exc}")
+
+
 @router.get("/api/sources")
 async def api_get_sources():
     return {"sources": load_sources()}
@@ -31,14 +46,8 @@ async def api_sources_tree(repo: str):
     if len(parts) != 2 or not all(p.strip() for p in parts):
         raise HTTPException(400, "Invalid repository format. Use 'owner/repo'")
     owner, repo_name = parts[0].strip(), parts[1].strip()
-    loop = asyncio.get_running_loop()
-    try:
-        folders = await loop.run_in_executor(executor, gh_get_repo_folders, owner, repo_name)
-        return {"folders": folders}
-    except urllib.error.HTTPError as exc:
-        raise HTTPException(exc.code, f"GitHub API error: HTTP {exc.code}")
-    except Exception as exc:
-        raise HTTPException(502, str(exc))
+    folders = await _run_gh(gh_get_repo_folders, owner, repo_name)
+    return {"folders": folders}
 
 
 @router.post("/api/sources")
@@ -47,48 +56,16 @@ async def api_add_source(req: SourceAddRequest):
     if len(parts) != 2 or not all(p.strip() for p in parts):
         raise HTTPException(400, "Invalid repository format. Use 'owner/repo'")
     owner, repo_name = parts[0].strip(), parts[1].strip()
-    loop = asyncio.get_running_loop()
-
-    assets: list = []
 
     if req.source_type == "releases":
-        try:
-            assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404:
-                raise HTTPException(404, "Repository not found")
-            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
-        except Exception as exc:
-            raise HTTPException(502, f"Could not reach GitHub: {exc}")
-
+        assets = await _run_gh(gh_get_releases, owner, repo_name)
     elif req.source_type == "folder":
         folder = req.folder.strip().strip("/") or None
-        try:
-            assets = await loop.run_in_executor(
-                executor, gh_scan_repo_files, owner, repo_name, folder
-            )
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404:
-                raise HTTPException(404, "Repository not found")
-            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
-        except Exception as exc:
-            raise HTTPException(502, f"Could not reach GitHub: {exc}")
-
+        assets = await _run_gh(gh_scan_repo_files, owner, repo_name, folder)
     else:
-        try:
-            assets = await loop.run_in_executor(executor, gh_scan_repo_files, owner, repo_name)
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404:
-                raise HTTPException(404, "Repository not found")
-            raise HTTPException(502, f"GitHub API error: HTTP {exc.code}")
-        except Exception as exc:
-            raise HTTPException(502, f"Could not reach GitHub: {exc}")
-
+        assets = await _run_gh(gh_scan_repo_files, owner, repo_name)
         if not assets:
-            try:
-                assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
-            except Exception as exc:
-                raise HTTPException(502, f"GitHub API error: {exc}")
+            assets = await _run_gh(gh_get_releases, owner, repo_name)
 
     if not assets:
         raise HTTPException(
@@ -175,11 +152,7 @@ async def api_source_releases(repo: str, asset: str = ""):
     if len(parts) != 2:
         raise HTTPException(400, "Use 'owner/repo'")
     owner, repo_name = parts
-    loop = asyncio.get_running_loop()
-    try:
-        assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
-    except Exception as exc:
-        raise HTTPException(502, f"GitHub API error: {exc}")
+    assets = await _run_gh(gh_get_releases, owner, repo_name)
     if asset:
         assets = [a for a in assets if a["asset_name"] == asset]
     return {"releases": assets}
@@ -196,48 +169,54 @@ async def api_check_updates():
         if repo:
             repos.setdefault(repo, []).append(fname)
     updates: list = []
+    errors:  list = []
     loop = asyncio.get_running_loop()
     for slug, filenames in repos.items():
         parts = slug.split("/")
         if len(parts) != 2:
+            errors.append({"repo": slug, "error": "Invalid repository format"})
             continue
         owner, repo_name = parts
         try:
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
-            if not assets:
+        except urllib.error.HTTPError as exc:
+            errors.append({"repo": slug, "error": f"HTTP {exc.code}"})
+            continue
+        except Exception as exc:
+            errors.append({"repo": slug, "error": str(exc)})
+            continue
+        if not assets:
+            continue
+        latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
+        newest_tag = assets[0]["tag"]
+        newest_release_assets = [a for a in assets if a["tag"] == newest_tag]
+
+        # Single-payload repo + single asset per release: trust the newest
+        # release as the source of truth, regardless of whether the saved
+        # asset filename still appears in the recent releases. This covers
+        # repos that embed the version into the filename
+        # (ShadowMountPlus_X.Y.zip) where the old name may still be present
+        # in the recent-3 release window.
+        single_payload_repo = (
+            len(filenames) == 1 and len(newest_release_assets) == 1
+        )
+
+        for fname in filenames:
+            m          = meta.get(fname, {})
+            current    = m.get("version", "")
+            asset_name = m.get("asset", fname)
+            if single_payload_repo:
+                latest = newest_release_assets[0]
+            else:
+                latest = latest_per_asset.get(asset_name)
+            if not latest:
                 continue
-            latest_per_asset = {a["asset_name"]: a for a in reversed(assets)}
-            newest_tag = assets[0]["tag"]
-            newest_release_assets = [a for a in assets if a["tag"] == newest_tag]
-
-            # Single-payload repo + single asset per release: trust the newest
-            # release as the source of truth, regardless of whether the saved
-            # asset filename still appears in the recent releases. This covers
-            # repos that embed the version into the filename
-            # (ShadowMountPlus_X.Y.zip) where the old name may still be present
-            # in the recent-3 release window.
-            single_payload_repo = (
-                len(filenames) == 1 and len(newest_release_assets) == 1
-            )
-
-            for fname in filenames:
-                m          = meta.get(fname, {})
-                current    = m.get("version", "")
-                asset_name = m.get("asset", fname)
-                if single_payload_repo:
-                    latest = newest_release_assets[0]
-                else:
-                    latest = latest_per_asset.get(asset_name)
-                if not latest:
-                    continue
-                if latest["tag"] != current:
-                    updates.append({
-                        "filename": fname, "current_version": current,
-                        "latest_version": latest["tag"],
-                        "download_url": latest["download_url"],
-                        "repo": slug,
-                        "asset_name": latest["asset_name"],
-                    })
-        except Exception:
-            pass
-    return {"updates": updates, "checked": len(repos)}
+            if latest["tag"] != current:
+                updates.append({
+                    "filename": fname, "current_version": current,
+                    "latest_version": latest["tag"],
+                    "download_url": latest["download_url"],
+                    "repo": slug,
+                    "asset_name": latest["asset_name"],
+                })
+    return {"updates": updates, "checked": len(repos), "errors": errors}

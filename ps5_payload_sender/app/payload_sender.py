@@ -119,6 +119,10 @@ async def send_payload(
 
     except (OSError, BrokenPipeError) as exc:
         writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
         return {
             "success": False,
             "message": f"Error sending '{filename}': {exc}",

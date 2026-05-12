@@ -690,10 +690,19 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
       }
       showToast(`${done} payload(s) updated`);
       await refreshPayloads();
+      // renderSourcesList() rebuilds the source-item nodes, which detaches
+      // updList/applyBtn from the DOM. Operating on them afterwards is a no-op
+      // and leaves the panel in a stale state. Re-render the panel with the
+      // remaining updates so the user sees the post-update status instead.
       renderSourcesList();
       _renderUpdateBadge(Object.keys(state.updateResults).length);
-      refreshApplyBtn();
-      if (!updList.querySelectorAll('.source-update-row').length) applyBtn.style.display = 'none';
+      const freshEl    = document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
+      const freshPanel = freshEl && freshEl.querySelector('.source-check-panel');
+      if (freshPanel) {
+        const remaining = Object.values(state.updateResults).filter(u => u.repo === repo);
+        _populateSourceCheckPanel(freshPanel, repo, newAssets, remaining, importedCount);
+        freshPanel.style.display = '';
+      }
     });
 
     panel.appendChild(applyBtn);
@@ -861,6 +870,10 @@ async function checkAllUpdates() {
     _renderUpdateBadge(data.updates.length);
     renderSourcesList();
     renderPayloads();
+    (data.errors || []).forEach(e => log(`Check '${e.repo}': ${e.error}`, 'warn'));
+    if (data.errors && data.errors.length) {
+      showToast(`${data.updates.length} update(s) · ${data.errors.length} repo(s) failed — see log`);
+    }
   } catch (e) { log('Check updates: ' + e.message, 'error'); }
   finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Check Updates'; }
