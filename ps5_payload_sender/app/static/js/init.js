@@ -62,6 +62,14 @@ async function init() {
   document.getElementById('btn-panel-wait-ok').addEventListener('click', builderAddWaitStep);
   document.getElementById('btn-panel-wait-x').addEventListener('click',  () => builderTogglePanel('wait'));
 
+  document.getElementById('btn-add-wait-loader').addEventListener('click', () => builderTogglePanel('wait_loader'));
+  document.getElementById('btn-panel-wfl-ok').addEventListener('click',    builderAddWaitForLoaderStep);
+  document.getElementById('btn-panel-wfl-x').addEventListener('click',     () => builderTogglePanel('wait_loader'));
+
+  document.getElementById('btn-add-notify').addEventListener('click',      () => builderTogglePanel('notify'));
+  document.getElementById('btn-panel-notify-ok').addEventListener('click', builderAddNotifyStep);
+  document.getElementById('btn-panel-notify-x').addEventListener('click',  () => builderTogglePanel('notify'));
+
   // Builder save / run
   document.getElementById('btn-builder-save').addEventListener('click', builderSave);
   document.getElementById('btn-builder-run').addEventListener('click', () => {
@@ -121,7 +129,7 @@ async function init() {
   await refreshProfiles();
   updateProfilesSummary();
   initCollapsible();
-  if (typeof initP2JBMonitor === 'function') await initP2JBMonitor();
+  if (typeof initFlowNotify === 'function') await initFlowNotify();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();

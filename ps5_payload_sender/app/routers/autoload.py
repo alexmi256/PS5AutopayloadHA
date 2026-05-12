@@ -11,9 +11,12 @@ from fastapi.responses import Response
 from atomic_write import atomic_write_text
 from autoload_parser import (
     DelayDirective,
+    NotifyDirective,
     SendDirective,
+    WaitForLoaderDirective,
     WaitPortDirective,
     parse_autoload_path,
+    parse_notify_config,
     parse_version_pins,
     set_version_pin,
 )
@@ -78,8 +81,9 @@ async def api_parse_profile(profile: str):
     p = PROFILES_DIR / Path(profile).name
     if not p.exists():
         raise HTTPException(404, "Profile not found")
-    content = p.read_text(encoding="utf-8", errors="replace")
+    content      = p.read_text(encoding="utf-8", errors="replace")
     version_pins = parse_version_pins(content)
+    notify_cfg   = parse_notify_config(content)
     steps = []
     for d in parse_autoload_path(p):
         if isinstance(d, SendDirective):
@@ -99,7 +103,27 @@ async def api_parse_profile(profile: str):
                 "timeout": d.timeout_seconds,
                 "interval_ms": d.interval_ms,
             })
-    return {"steps": steps, "profile": p.name, "version_pins": version_pins}
+        elif isinstance(d, WaitForLoaderDirective):
+            steps.append({
+                "type": "wait_for_loader",
+                "port": d.port,
+                "max_wait_s": d.max_wait_seconds,
+                "interval_s": d.interval_seconds,
+                "stability_count": d.stability_count,
+            })
+        elif isinstance(d, NotifyDirective):
+            steps.append({
+                "type": "notify",
+                "title": d.title,
+                "message": d.message,
+                "service_override": d.service_override or "",
+            })
+    return {
+        "steps":         steps,
+        "profile":       p.name,
+        "version_pins":  version_pins,
+        "notify_config": notify_cfg,
+    }
 
 
 @router.post("/api/autoload/patch-versions/{profile}")

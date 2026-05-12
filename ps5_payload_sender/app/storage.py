@@ -22,8 +22,7 @@ from config import (
     OLD_DEVICES_FILE,
     OLD_PAYLOAD_DIR,
     OLD_STATE_FILE,
-    P2JB_CONFIG_FILE,
-    P2JB_HISTORY_FILE,
+    FLOW_HISTORY_FILE,
     PAYLOAD_DIR,
     PAYLOAD_META_FILE,
     PROFILES_DIR,
@@ -160,24 +159,6 @@ def list_payloads() -> List[dict]:
                 entry["source"] = src
             result.append(entry)
     return result
-
-
-# ── P2JB monitor config persistence ───────────────────────────────
-# (Only the *settings* are persisted, not the running-task state. The
-#  user chose "always start fresh" for monitor activity across restarts.)
-
-def load_p2jb_config() -> Dict[str, Any]:
-    if not P2JB_CONFIG_FILE.exists():
-        return {}
-    try:
-        return json.loads(P2JB_CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        _log.warning("load_p2jb_config: %s", exc)
-        return {}
-
-
-def save_p2jb_config(cfg: Dict[str, Any]) -> None:
-    atomic_write_text(P2JB_CONFIG_FILE, json.dumps(cfg, indent=2))
 
 
 def list_profiles() -> List[str]:
@@ -411,7 +392,7 @@ def reset_config() -> dict:
     # Wipe config JSON files
     for cfg_f in (SOURCES_FILE, STATE_FILE, DEVICES_FILE,
                   PAYLOAD_META_FILE, TIMING_FILE, FLOW_RUNS_FILE,
-                  P2JB_CONFIG_FILE, P2JB_HISTORY_FILE):
+                  FLOW_HISTORY_FILE):
         if cfg_f.exists():
             cfg_f.unlink()
 

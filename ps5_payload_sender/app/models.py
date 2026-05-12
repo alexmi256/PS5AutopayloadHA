@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SendRequest(BaseModel):
@@ -73,17 +73,35 @@ class AnalyzePortRequest(BaseModel):
 
 
 class FlowStepModel(BaseModel):
-    type: str                           # 'payload' | 'delay' | 'wait_port'
-    # payload fields
+    """Builder-side flow step. ``type`` selects which fields are used.
+
+    Supported step types:
+      ``payload`` ............ send a payload file
+      ``delay`` .............. sleep N ms
+      ``wait_port`` .......... short wait until a TCP port is reachable
+      ``wait_for_loader`` .... long P2JB-style wait; fires loader-ready
+                               notification and fails the flow on timeout
+      ``notify`` ............. emit a free-form notification
+    """
+    type: str
+    # payload
     filename: str = ""
     autoPort: int = 0
     portOverride: Optional[int] = None
-    # delay fields
+    # delay
     ms: int = 0
-    # wait_port fields
+    # wait_port + wait_for_loader common
     port: int = 0
     timeout: float = 60.0
     interval_ms: int = 500
+    # wait_for_loader extras
+    max_wait_s: float = 10800.0
+    interval_s: float = 30.0
+    stability_count: int = 1
+    # notify
+    title: str = ""
+    message: str = ""
+    service_override: Optional[str] = None
 
 
 class FlowAnalyzeRequest(BaseModel):
@@ -104,35 +122,35 @@ class PatchFlowVersionsRequest(BaseModel):
     version: str
 
 
-class P2JBMonitorConfig(BaseModel):
-    """Configuration for the P2JB / Patience loader-ready monitor."""
-    host: str
-    elf_port: int = 9021
-    lua_port: Optional[int] = None             # None = don't poll LUA
-    check_interval: float = 30.0               # seconds between polls
-    max_wait: float = 10800.0                  # 3 hours
-    auto_run: bool = False                     # run a saved flow when loader ready
-    flow_name: Optional[str] = None            # saved-profile name (.txt optional)
-    # Notification toggles
-    notify_loader_ready: bool = True
-    notify_flow_started: bool = False
-    notify_flow_completed: bool = True
-    notify_flow_failed: bool = True
-    # Optional notify.<service> on top of persistent_notification
-    notify_service: Optional[str] = None
+class FlowNotifyConfig(BaseModel):
+    """Per-flow notification preferences (matches the ``# ~notify …``
+    header in the saved profile)."""
+    loader_ready:   bool = True
+    flow_started:   bool = False
+    flow_completed: bool = True
+    flow_failed:    bool = True
+    service:        str  = ""           # must start with "notify." if set
+
+    @field_validator("service")
+    @classmethod
+    def _service_must_start_with_notify(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v and not v.startswith("notify."):
+            raise ValueError("notify service must start with 'notify.'")
+        return v
 
 
-class P2JBTestRequest(BaseModel):
-    """Body for /api/p2jb/test — Advanced-Mode notification + simulation."""
-    event: str                                # one of the keys below
-    host: str = ""                            # for nicer test bodies
-    elf_port: int = 9021
-    flow_name: Optional[str] = None
-    notify_service: Optional[str] = None
-    # Only relevant for event="simulate_loader_ready":
-    run_real_flow: bool = False
-    # Pass the full notify-toggle set so simulation respects user choices
-    notify_loader_ready: bool = True
-    notify_flow_started: bool = False
-    notify_flow_completed: bool = True
-    notify_flow_failed: bool = True
+class FlowNotifyTestRequest(BaseModel):
+    """Body for /api/flow/test_notification (Advanced Mode tools).
+
+    ``event`` ∈ ``{persistent, service, loader_ready, flow_started,
+    flow_completed, flow_failed, simulate_loader_ready}``.
+    For ``simulate_loader_ready`` the optional ``run_flow`` field
+    indicates whether the user opted to also run *flow_name* for real.
+    """
+    event: str
+    notify: FlowNotifyConfig = FlowNotifyConfig()
+    host: str = ""
+    port: int = 9021
+    flow_name: str = ""
+    run_flow: bool = False

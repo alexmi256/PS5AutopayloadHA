@@ -108,6 +108,8 @@ function handleExecState(execState, profile) {
     }
     // Delay clear so user can see final ✔/✗ briefly
     setTimeout(clearStepRunStatus, 1800);
+    // Refresh recent-runs history after a terminal transition
+    if (typeof flowHistoryRefresh === 'function') flowHistoryRefresh();
   }
 
   // Sync Quick Start tiles and profile list
@@ -157,11 +159,57 @@ function builderUpdatePayloadDropdown() {
 
 // ── Panels ───────────────────────────────────────────────────────
 function builderTogglePanel(type) {
-  const panels = { payload: 'panel-payload', delay: 'panel-delay', wait: 'panel-wait' };
+  const panels = {
+    payload:     'panel-payload',
+    delay:       'panel-delay',
+    wait:        'panel-wait',
+    wait_loader: 'panel-wait-loader',
+    notify:      'panel-notify',
+  };
   Object.entries(panels).forEach(([t, id]) => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.style.display = (t === type && el.style.display === 'none') ? '' : 'none';
   });
+}
+
+function builderAddWaitForLoaderStep() {
+  const port      = parseInt(document.getElementById('panel-wfl-port').value, 10);
+  const maxMin    = parseFloat(document.getElementById('panel-wfl-max').value)  || 180;
+  const intervalS = parseFloat(document.getElementById('panel-wfl-iv').value)   || 30;
+  const stab      = parseInt(document.getElementById('panel-wfl-stab').value, 10) || 1;
+  if (!port || port < 1 || port > 65535) { alert('Invalid port!'); return; }
+  if (intervalS < 1) { alert('Interval must be ≥ 1 second'); return; }
+  builder.steps.push({
+    type: 'wait_for_loader',
+    port,
+    max_wait_s: Math.max(intervalS, maxMin * 60),
+    interval_s: intervalS,
+    stability_count: Math.max(1, stab),
+  });
+  document.getElementById('panel-wait-loader').style.display = 'none';
+  builderRenderList(); scheduleSave();
+}
+
+function builderAddNotifyStep() {
+  const title = (document.getElementById('panel-notify-title').value || '').trim();
+  const msg   = (document.getElementById('panel-notify-msg').value   || '').trim();
+  const svc   = (document.getElementById('panel-notify-svc')?.value  || '').trim();
+  if (!title) { alert('Title is required'); return; }
+  if (svc && !svc.startsWith('notify.')) {
+    alert('Service override must start with notify.');
+    return;
+  }
+  builder.steps.push({
+    type: 'notify', title, message: msg, service_override: svc || '',
+  });
+  document.getElementById('panel-notify-title').value = '';
+  document.getElementById('panel-notify-msg').value   = '';
+  if (document.getElementById('panel-notify-svc')) {
+    document.getElementById('panel-notify-svc').value = '';
+  }
+  document.getElementById('panel-notify').style.display = 'none';
+  builderRenderList(); scheduleSave();
 }
 
 // Called when user selects a payload in the dropdown (basic mode: immediate add)
@@ -536,6 +584,112 @@ function _buildWaitStep(step, idx, stepEl, mainRow, btns) {
   stepEl.appendChild(advDetails);
 }
 
+function _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns) {
+  const badge = document.createElement('span');
+  badge.className = 'step-type step-wait-loader';
+  badge.textContent = 'WAIT FOR LOADER';
+
+  mainRow.appendChild(_builderMakeDragHandle(stepEl));
+  mainRow.appendChild(_makeStepNum(idx));
+  mainRow.appendChild(badge);
+  mainRow.appendChild(_makeStepStatusBadge(idx));
+  const hSpacer = document.createElement('span'); hSpacer.style.flex = '1';
+  mainRow.appendChild(hSpacer);
+  mainRow.appendChild(btns);
+  stepEl.appendChild(mainRow);
+
+  function makeField(labelText, value, min, max, unit, onChange) {
+    const field = document.createElement('div');
+    field.className = 'step-field';
+    const lbl = document.createElement('span');
+    lbl.className = 'step-field-label'; lbl.textContent = labelText;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'step-input';
+    inp.value = value; inp.min = String(min);
+    if (max) inp.max = String(max);
+    inp.addEventListener('input', e => onChange(parseFloat(e.target.value)));
+    const u = document.createElement('span');
+    u.className = 'step-unit'; u.textContent = unit;
+    field.appendChild(lbl); field.appendChild(inp); field.appendChild(u);
+    return field;
+  }
+
+  // Port (always)
+  const portRow = document.createElement('div');
+  portRow.className = 'step-content-row';
+  portRow.appendChild(makeField('Port', step.port, 1, 65535, '', v => {
+    if (v > 0 && v <= 65535) { builder.steps[idx].port = v; scheduleSave(); }
+  }));
+  stepEl.appendChild(portRow);
+
+  // Advanced: max wait + interval + stability
+  const adv = document.createElement('div');
+  adv.className = 'step-details advanced-only';
+  adv.appendChild(makeField('Max wait', Math.round((step.max_wait_s || 10800) / 60), 1, null, 'min', v => {
+    if (v > 0) { builder.steps[idx].max_wait_s = v * 60; scheduleSave(); }
+  }));
+  adv.appendChild(makeField('Interval', step.interval_s || 30, 1, null, 's', v => {
+    if (v >= 1) { builder.steps[idx].interval_s = v; scheduleSave(); }
+  }));
+  adv.appendChild(makeField('Stability', step.stability_count || 1, 1, 10, '', v => {
+    if (v >= 1) { builder.steps[idx].stability_count = v; scheduleSave(); }
+  }));
+  stepEl.appendChild(adv);
+}
+
+function _buildNotifyStep(step, idx, stepEl, mainRow, btns) {
+  const badge = document.createElement('span');
+  badge.className = 'step-type step-notify';
+  badge.textContent = 'NOTIFY';
+
+  mainRow.appendChild(_builderMakeDragHandle(stepEl));
+  mainRow.appendChild(_makeStepNum(idx));
+  mainRow.appendChild(badge);
+  mainRow.appendChild(_makeStepStatusBadge(idx));
+  const hSpacer = document.createElement('span'); hSpacer.style.flex = '1';
+  mainRow.appendChild(hSpacer);
+  mainRow.appendChild(btns);
+  stepEl.appendChild(mainRow);
+
+  // Title + message inline editing
+  function makeInput(label, value, onChange, advanced = false) {
+    const field = document.createElement('div');
+    field.className = 'step-field' + (advanced ? ' advanced-only' : '');
+    const lbl = document.createElement('span');
+    lbl.className = 'step-field-label'; lbl.textContent = label;
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'step-input';
+    inp.style.flex = '1';
+    inp.value = value || '';
+    inp.addEventListener('input', e => onChange(e.target.value));
+    field.appendChild(lbl); field.appendChild(inp);
+    return field;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'step-content-row';
+  row.appendChild(makeInput('Title', step.title, v => {
+    builder.steps[idx].title = v; scheduleSave();
+  }));
+  stepEl.appendChild(row);
+
+  const row2 = document.createElement('div');
+  row2.className = 'step-content-row';
+  row2.appendChild(makeInput('Message', step.message, v => {
+    builder.steps[idx].message = v; scheduleSave();
+  }));
+  stepEl.appendChild(row2);
+
+  const adv = document.createElement('div');
+  adv.className = 'step-content-row advanced-only';
+  adv.appendChild(makeInput('Override', step.service_override, v => {
+    const val = (v || '').trim();
+    if (val && !val.startsWith('notify.')) return;   // ignore invalid
+    builder.steps[idx].service_override = val; scheduleSave();
+  }, true));
+  stepEl.appendChild(adv);
+}
+
 // ── List render ───────────────────────────────────────────────────
 function builderRenderList() {
   const container = document.getElementById('builder-steps');
@@ -553,9 +707,12 @@ function builderRenderList() {
     mainRow.className = 'step-main';
     const btns = _builderMakeOrderBtns(idx);
 
-    if      (step.type === 'payload') _buildPayloadStep(step, idx, stepEl, mainRow, btns);
-    else if (step.type === 'delay')   _buildDelayStep(step,   idx, stepEl, mainRow, btns);
-    else                              _buildWaitStep(step,    idx, stepEl, mainRow, btns);
+    if      (step.type === 'payload')         _buildPayloadStep(step, idx, stepEl, mainRow, btns);
+    else if (step.type === 'delay')           _buildDelayStep(step,   idx, stepEl, mainRow, btns);
+    else if (step.type === 'wait_port')       _buildWaitStep(step,    idx, stepEl, mainRow, btns);
+    else if (step.type === 'wait_for_loader') _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns);
+    else if (step.type === 'notify')          _buildNotifyStep(step,  idx, stepEl, mainRow, btns);
+    else                                      _buildWaitStep(step,    idx, stepEl, mainRow, btns);
 
     container.appendChild(stepEl);
   });
@@ -588,10 +745,33 @@ function builderGenerate() {
     if (step.type === 'payload')
       return step.portOverride ? `${step.filename} ${step.portOverride}` : step.filename;
     if (step.type === 'delay') return `!${step.ms}`;
+    if (step.type === 'wait_for_loader') {
+      const max = Math.max(step.interval_s || 30, step.max_wait_s || 10800);
+      const iv  = Math.max(1, step.interval_s || 30);
+      const sc  = Math.max(1, step.stability_count || 1);
+      return `??${step.port} ${max} ${iv} ${sc}`;
+    }
+    if (step.type === 'notify') {
+      const t   = (step.title   || '').replace(/"/g, '\\"');
+      const msg = (step.message || '').replace(/"/g, '\\"');
+      const svc = (step.service_override || '').trim();
+      return svc ? `@notify "${t}" "${msg}" ${svc}` : `@notify "${t}" "${msg}"`;
+    }
+    // wait_port (default)
     const intervalMs = step.interval_ms || 500;
     return `?${step.port} ${step.timeout} ${intervalMs}`;
   });
-  return [...pins, ...directives].join('\n');
+  // Per-flow notify config header — emitted only if the helper is present
+  // and at least one event is enabled or a service is set.
+  let header = [];
+  if (typeof flowNotifyReadConfig === 'function') {
+    const cfg = flowNotifyReadConfig();
+    const anyOn = cfg.loader_ready || cfg.flow_started || cfg.flow_completed || cfg.flow_failed;
+    if (anyOn || cfg.service) {
+      header.push(flowNotifyRenderHeader(cfg));
+    }
+  }
+  return [...header, ...pins, ...directives].join('\n');
 }
 
 async function builderSave() {

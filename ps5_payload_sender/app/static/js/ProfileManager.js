@@ -133,6 +133,9 @@ async function editProfile(name) {
     }
     builder.steps = data.steps;
     document.getElementById('builder-profile-name').value = name.replace(/\.txt$/i, '');
+    if (data.notify_config && typeof flowNotifyApplyConfig === 'function') {
+      flowNotifyApplyConfig(data.notify_config);
+    }
     builderRenderList(); scheduleSave();
     document.getElementById('builder-card').scrollIntoView({ behavior: 'smooth' });
     log(`Profile '${name}' loaded into builder`, 'success');

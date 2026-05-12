@@ -460,8 +460,31 @@ body {
 .payload-label      { font-weight:600; padding:2px 8px; border-radius:6px; font-size:12px; flex-shrink:0; }
 .payload-label.lua  { background:rgba(245,158,11,.18); color:var(--lua) }
 .payload-label.elf  { background:rgba(59,130,246,.18); color:var(--elf) }
-.step-delay { background:rgba(16,185,129,.15); color:var(--green) }
-.step-wait  { background:rgba(148,163,184,.15); color:var(--muted) }
+.step-delay       { background:rgba(16,185,129,.15);  color:var(--green)   }
+.step-wait        { background:rgba(148,163,184,.15); color:var(--muted)   }
+.step-wait-loader { background:rgba(245,158,11,.15);  color:var(--warn)    }
+.step-notify      { background:rgba(99,102,241,.18);  color:var(--primary) }
+
+/* Per-flow notify config inside the builder */
+.flow-notify-block {
+  margin:.6rem 0 .4rem;
+  background:var(--bg-soft); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:.45rem .65rem;
+}
+.flow-notify-block > summary {
+  cursor:pointer; font-weight:600; font-size:.85rem;
+  color:var(--text); padding:.15rem 0;
+  list-style:none;
+}
+.flow-notify-block > summary::-webkit-details-marker { display:none }
+.flow-notify-block > summary::before {
+  content:'▸ '; color:var(--muted); display:inline-block;
+  transition:transform .15s ease;
+}
+.flow-notify-block[open] > summary::before { content:'▾ '; }
+.flow-notify-body { margin-top:.45rem }
+
+.input-error { border-color:var(--danger) !important }
 .step-filename {
   flex:1; font-size:.87rem; line-height:1.35; min-width:0;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
