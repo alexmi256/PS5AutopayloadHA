@@ -250,7 +250,10 @@ function buildPayloadItem(p) {
       rowSrc.appendChild(upToDate);
     }
 
-    // ── Builder / saved-flow usage: "Update flows" button or simple badge ──
+    // ── Builder / saved-flow usage: "Apply to flows" button or simple badge ──
+    // (Distinct from the "Update flows" button above: this one applies the
+    // currently-selected dropdown version to all flows that reference this
+    // payload, while "Update flows" pulls a newer version from GitHub.)
     {
       const builderMatches = builder.steps
         .map((s, idx) => ({ step: s, idx }))
@@ -259,8 +262,8 @@ function buildPayloadItem(p) {
       if (builderMatches.length && hasMultiVer) {
         const updBtn = document.createElement('button');
         updBtn.className   = 'btn btn-sm';
-        updBtn.textContent = 'Update flows';
-        updBtn.title       = 'Update all flows using this payload to the selected version';
+        updBtn.textContent = 'Apply to flows';
+        updBtn.title       = 'Apply the currently selected version to every flow that uses this payload';
         updBtn.addEventListener('click', async ev => {
           ev.stopPropagation();
           updBtn.disabled    = true;
@@ -285,7 +288,7 @@ function buildPayloadItem(p) {
             console.log('Only 1 usage found. All flows:', state.profiles);
           }
           updBtn.disabled    = false;
-          updBtn.textContent = 'Update flows';
+          updBtn.textContent = 'Apply to flows';
           _openUpdateUsagesDialog(p, builderMatches, usedInProfiles, flowDetails);
         });
         rowSrc.appendChild(updBtn);
@@ -543,7 +546,7 @@ function _openUpdateUsagesDialog(p, stepMatches, usedInProfiles, flowDetails) {
 
   const title = document.createElement('div');
   title.className   = 'modal-title';
-  title.textContent = `Update flows — ${p.name}`;
+  title.textContent = `Apply to flows — ${p.name}`;
   box.appendChild(title);
 
   const verInfo = document.createElement('div');
