@@ -19,7 +19,8 @@ const FLOW_RESULT_LABEL = {
 };
 
 const _FLOW_LOADER_FIELD_IDS = [
-  'flow-notify-ready', 'flow-loader-port', 'flow-loader-interval', 'flow-loader-timeout',
+  'flow-wait-for-loader', 'flow-notify-ready', 'flow-loader-port',
+  'flow-loader-interval', 'flow-loader-timeout',
 ];
 
 async function initFlowNotify() {
@@ -60,6 +61,7 @@ function flowNotifyReadConfig() {
     return Number.isFinite(v) && v > 0 ? v : fallback;
   };
   return {
+    wait_for_loader_enabled: document.getElementById('flow-wait-for-loader').checked,
     loader_ready:      document.getElementById('flow-notify-ready').checked,
     flow_started:      document.getElementById('flow-notify-started').checked,
     flow_completed:    document.getElementById('flow-notify-completed').checked,
@@ -75,6 +77,7 @@ function flowNotifyReadConfig() {
 
 function flowNotifyApplyConfig(cfg) {
   cfg = cfg || {};
+  document.getElementById('flow-wait-for-loader').checked  = !!cfg.wait_for_loader_enabled;
   document.getElementById('flow-notify-ready').checked     = cfg.loader_ready    !== false;
   document.getElementById('flow-notify-started').checked   = !!cfg.flow_started;
   document.getElementById('flow-notify-completed').checked = cfg.flow_completed  !== false;
@@ -98,6 +101,7 @@ function flowNotifyRenderHeader(cfg) {
     `flow_completed=${cfg.flow_completed ? 'on' : 'off'}`,
     `flow_failed=${cfg.flow_failed ? 'on' : 'off'}`,
   ];
+  if (cfg.wait_for_loader_enabled) parts.push('wait_for_loader_enabled=on');
   if ((cfg.loader_port       || 9021)  !== 9021)  parts.push(`loader_port=${cfg.loader_port}`);
   if ((cfg.loader_interval_s || 30)    !== 30)    parts.push(`loader_interval_s=${cfg.loader_interval_s}`);
   if ((cfg.loader_max_wait_s || 10800) !== 10800) parts.push(`loader_max_wait_s=${cfg.loader_max_wait_s}`);
@@ -106,31 +110,27 @@ function flowNotifyRenderHeader(cfg) {
   return `# ~notify ${parts.join(' ')}`;
 }
 
-// Show/hide loader-config rows depending on the loader_ready toggle, and
-// flash the warning when loader notifications are enabled but the builder
-// has no WAIT FOR LOADER step yet.
+// Show/hide the loader-related block based on the master "Wait for loader"
+// toggle, and the persistent-notification row based on whether a service
+// is configured. There's no "must add a ?? step" warning anymore — the
+// WAIT FOR LOADER step type is gone; the master toggle IS the trigger.
 function _flowUpdateLoaderUI() {
-  const cfgRow  = document.getElementById('flow-loader-config');
-  const warn    = document.getElementById('flow-loader-warn');
-  const ready   = document.getElementById('flow-notify-ready');
-  if (!cfgRow || !ready) return;
-  cfgRow.style.display = ready.checked ? '' : 'none';
+  const master = document.getElementById('flow-wait-for-loader');
+  if (!master) return;
+  const show = master.checked;
+  document.querySelectorAll('.flow-loader-only').forEach(el => {
+    el.style.display = show ? '' : 'none';
+  });
 
-  // Sync the persistent checkbox visibility — only relevant when a
-  // service is set (otherwise persistent is the only channel anyway).
+  // Persistent-notification toggle only matters when a notify.<service>
+  // target is set — otherwise persistent is the only channel anyway.
   const svc  = document.getElementById('flow-notify-service').value.trim();
   const row  = document.getElementById('flow-notify-persistent-row');
   if (row) row.style.display = svc ? '' : 'none';
-
-  // Builder-side warning: loader notifications need a ?? step in the flow.
-  const hasWfl = typeof builder !== 'undefined'
-    && Array.isArray(builder.steps)
-    && builder.steps.some(s => s.type === 'wait_for_loader');
-  if (warn) warn.style.display = (ready.checked && !hasWfl) ? '' : 'none';
 }
 
-// Exposed so AutoLoadBuilder can call it after every render (steps changed
-// → maybe a wait_for_loader step appeared or disappeared).
+// Builder calls this after re-rendering. Kept for back-compat with the
+// existing call site even though the warning logic is gone.
 window.flowNotifyRefreshWarn = _flowUpdateLoaderUI;
 
 // ─── Validation ──────────────────────────────────────────────────

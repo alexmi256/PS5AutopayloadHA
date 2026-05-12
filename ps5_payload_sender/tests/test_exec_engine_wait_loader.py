@@ -161,6 +161,58 @@ def test_wait_for_loader_timeout_fails_flow(tmp_profile, patched_io, tmp_history
     assert "not detected within" in runs[0]["error"]
 
 
+def test_flow_level_wait_runs_before_payload_steps(tmp_profile, patched_io, tmp_history):
+    """New-style flow uses the header toggle (no ?? step). The loader
+    wait happens before any payload step runs."""
+    name = tmp_profile(
+        '# ~notify loader_ready=on flow_completed=on '
+        'wait_for_loader_enabled=on loader_port=9021 '
+        'loader_interval_s=1 loader_max_wait_s=60\n'
+        'kpayload.elf\n'
+    )
+    patched_io["port_plan"] = [False, True]
+
+    async def scenario():
+        return await exec_engine.run_autoload(AutoloadRequest(
+            host="10.0.0.5", profile=name, continue_on_error=False,
+        ))
+
+    result = asyncio.run(scenario())
+    assert result["success"] is True
+    events = [n["event"] for n in patched_io["notifications"]]
+    assert "loader_ready" in events
+    assert "flow_completed" in events
+    assert patched_io["payloads"], "payload step must run after the wait"
+    runs = flow_history.get_runs()
+    assert runs[0]["result"] == "completed"
+    assert runs[0]["loader_port"] == 9021
+
+
+def test_flow_level_wait_timeout_blocks_payload_steps(tmp_profile, patched_io, tmp_history):
+    """If the flow-level wait times out, NO payload step runs and the
+    flow records as failed_timeout."""
+    name = tmp_profile(
+        '# ~notify flow_failed=on wait_for_loader_enabled=on '
+        'loader_port=9021 loader_interval_s=1 loader_max_wait_s=2\n'
+        'kpayload.elf\n'                   # MUST NOT run
+    )
+    patched_io["port_plan"] = [False] * 50
+
+    async def scenario():
+        return await exec_engine.run_autoload(AutoloadRequest(
+            host="10.0.0.5", profile=name,
+        ))
+
+    result = asyncio.run(scenario())
+    assert result["success"] is False
+    assert patched_io["payloads"] == []
+    events = [n["event"] for n in patched_io["notifications"]]
+    assert "flow_failed" in events
+    runs = flow_history.get_runs()
+    assert runs[0]["result"] == "failed_timeout"
+    assert "not detected within" in runs[0]["error"]
+
+
 def test_wait_for_loader_requires_stability(tmp_profile, patched_io, tmp_history):
     """With stability=2 a single True must NOT advance the step."""
     name = tmp_profile(

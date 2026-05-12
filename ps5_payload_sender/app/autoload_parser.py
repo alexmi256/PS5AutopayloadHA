@@ -123,22 +123,23 @@ def set_version_pin(content: str, filename: str, version: str) -> str:
 
 _DEFAULT_NOTIFY_CONFIG: Dict[str, Any] = {
     # Event toggles
-    "loader_ready":      True,
-    "flow_started":      False,
-    "flow_completed":    True,
-    "flow_failed":       True,
+    "loader_ready":          True,
+    "flow_started":          False,
+    "flow_completed":        True,
+    "flow_failed":           True,
     # Delivery
-    "service":           "",          # notify.<service>; empty = persistent only
-    "persistent":        True,        # send HA persistent_notification.create
-    # Loader-watch config (used by wait_for_loader steps that don't carry
-    # their own params and as the source of truth for the UI panel)
-    "loader_port":       9021,
-    "loader_interval_s": 30,
-    "loader_max_wait_s": 10800,       # 3 h
+    "service":               "",       # notify.<service>; empty = persistent only
+    "persistent":            True,     # send HA persistent_notification.create
+    # Loader-watch — flow-level master switch (replaces the WAIT FOR LOADER step)
+    "wait_for_loader_enabled": False,
+    "loader_port":           9021,
+    "loader_interval_s":     30,
+    "loader_max_wait_s":     10800,    # 3 h
 }
 
 _BOOL_KEYS = (
-    "loader_ready", "flow_started", "flow_completed", "flow_failed", "persistent",
+    "loader_ready", "flow_started", "flow_completed", "flow_failed",
+    "persistent", "wait_for_loader_enabled",
 )
 _INT_KEYS  = ("loader_port", "loader_interval_s", "loader_max_wait_s")
 
@@ -194,7 +195,10 @@ def render_notify_config(cfg: Dict[str, Any]) -> str:
     parts = []
     for key in ("loader_ready", "flow_started", "flow_completed", "flow_failed"):
         parts.append(f"{key}={'on' if cfg.get(key) else 'off'}")
-    # Loader config emitted only when notifications are enabled OR values differ from defaults
+    # Flow-level loader-wait master switch (replaces the WAIT FOR LOADER step)
+    if cfg.get("wait_for_loader_enabled"):
+        parts.append("wait_for_loader_enabled=on")
+    # Loader config emitted only when values differ from defaults
     for key, default in (("loader_port", 9021),
                          ("loader_interval_s", 30),
                          ("loader_max_wait_s", 10800)):

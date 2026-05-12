@@ -103,16 +103,27 @@ def test_notify_third_arg_not_service_folds_into_message():
 def test_parse_notify_config_defaults():
     cfg = parse_notify_config("# no header\nfoo.elf\n")
     assert cfg == {
-        "loader_ready":      True,
-        "flow_started":      False,
-        "flow_completed":    True,
-        "flow_failed":       True,
-        "service":           "",
-        "persistent":        True,
-        "loader_port":       9021,
-        "loader_interval_s": 30,
-        "loader_max_wait_s": 10800,
+        "loader_ready":            True,
+        "flow_started":            False,
+        "flow_completed":          True,
+        "flow_failed":             True,
+        "service":                 "",
+        "persistent":              True,
+        "wait_for_loader_enabled": False,
+        "loader_port":             9021,
+        "loader_interval_s":       30,
+        "loader_max_wait_s":       10800,
     }
+
+
+def test_render_notify_config_emits_wait_flag_when_enabled():
+    line = render_notify_config({
+        "loader_ready": True, "flow_started": False, "flow_completed": True,
+        "flow_failed": True, "wait_for_loader_enabled": True,
+        "loader_port": 9021, "loader_interval_s": 30, "loader_max_wait_s": 10800,
+        "persistent": True, "service": "",
+    })
+    assert "wait_for_loader_enabled=on" in line
 
 
 def test_parse_notify_config_extra_fields():
@@ -164,18 +175,18 @@ def test_set_notify_config_replaces_existing_in_place():
 
 def test_render_notify_config_round_trip():
     cfg = {
-        "loader_ready":      True,
-        "flow_started":      False,
-        "flow_completed":    True,
-        "flow_failed":       False,
-        "service":           "notify.x",
-        "persistent":        True,
-        "loader_port":       9021,
-        "loader_interval_s": 30,
-        "loader_max_wait_s": 10800,
+        "loader_ready":            True,
+        "flow_started":            False,
+        "flow_completed":          True,
+        "flow_failed":             False,
+        "service":                 "notify.x",
+        "persistent":              True,
+        "wait_for_loader_enabled": True,
+        "loader_port":             9021,
+        "loader_interval_s":       30,
+        "loader_max_wait_s":       10800,
     }
     line = render_notify_config(cfg)
-    # parsing the line back must yield the same config
     parsed = parse_notify_config(line + "\n")
     assert parsed == cfg
 
