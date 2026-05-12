@@ -194,21 +194,18 @@ function builderTogglePanel(type) {
 }
 
 function builderAddWaitForLoaderStep() {
-  const port      = parseInt(document.getElementById('panel-wfl-port').value, 10);
-  const maxMin    = parseFloat(document.getElementById('panel-wfl-max').value)  || 180;
-  const intervalS = parseFloat(document.getElementById('panel-wfl-iv').value)   || 30;
-  const stab      = parseInt(document.getElementById('panel-wfl-stab').value, 10) || 1;
-  if (!port || port < 1 || port > 65535) { alert('Invalid port!'); return; }
-  if (intervalS < 1) { alert('Interval must be ≥ 1 second'); return; }
+  // Pure marker — port/interval/timeout live in the Flow Notifications
+  // panel and are written to the ~notify header on save. Values stay at
+  // 0 / 0 / 0 so the engine knows to pull defaults from the header.
   builder.steps.push({
     type: 'wait_for_loader',
-    port,
-    max_wait_s: Math.max(intervalS, maxMin * 60),
-    interval_s: intervalS,
-    stability_count: Math.max(1, stab),
+    port: 0, max_wait_s: 0, interval_s: 0, stability_count: 1,
   });
   document.getElementById('panel-wait-loader').style.display = 'none';
   builderRenderList(); scheduleSave();
+  // Nudge the user to confirm their loader settings if loader_ready was
+  // somehow turned off — opening the details makes the panel visible.
+  if (typeof flowNotifyRefreshWarn === 'function') flowNotifyRefreshWarn();
 }
 
 function builderAddNotifyStep() {
@@ -624,15 +621,22 @@ function _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns) {
   const hint = document.createElement('div');
   hint.className = 'step-config-pointer';
   // Read live from the flow notify config so the hint stays accurate.
+  // Step-level overrides (legacy flows) win if present; otherwise the
+  // values shown match what the engine will use at run time.
   const cfg = (typeof flowNotifyReadConfig === 'function')
     ? flowNotifyReadConfig() : {};
-  const port = (step.port || cfg.loader_port || 9021);
-  const maxMin = Math.round(((step.max_wait_seconds || step.max_wait_s
-                              || cfg.loader_max_wait_s || 10800)) / 60);
+  const port    = step.port || cfg.loader_port || 9021;
+  const ival    = Math.round(step.interval_s
+                              || step.interval_seconds
+                              || cfg.loader_interval_s
+                              || 30);
+  const maxMin  = Math.round((step.max_wait_seconds || step.max_wait_s
+                              || cfg.loader_max_wait_s || 10800) / 60);
   hint.innerHTML =
     `<span class="step-config-summary">`
     + `Port <strong>${port}</strong> · `
-    + `Timeout after <strong>${maxMin}</strong> min`
+    + `Interval <strong>${ival}</strong>s · `
+    + `Timeout <strong>${maxMin}</strong>m`
     + `</span>`
     + ` <a href="#flow-notify-card" class="step-config-link">Edit in Flow Notifications ↑</a>`;
   stepEl.appendChild(hint);
