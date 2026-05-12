@@ -4,6 +4,7 @@
 
 ### Bug Fixes (continued)
 
+- **Per-source "↻ Check" panel never appeared in 1.1.1-dev**: clicking ↻ Check showed only a toast — the result panel that 1.1.1 opens below the source stayed hidden. Cause: the new highlight-affected-sources feature added a `renderSourcesList()` call inside `checkSourceUpdates`, which rebuilds every `.source-item` from scratch. The `panel` reference captured before that call was then a detached DOM node, so populating it and setting `display=''` had no visible effect. The panel is now re-queried after `renderSourcesList()` runs (in both the success and error paths) before being shown.
 - **Per-source "↻ Check" silently did nothing on failed requests**: when `/api/sources/releases` returned an error (e.g. 502 because a repo has no releases or because GitHub rate-limited the request), the frontend swallowed the exception and left the panel hidden — users got no visible feedback at all. The panel is now opened with the error message so the cause is visible.
 - **Global "Check Updates" still missed single-payload repos with versioned filenames** when the old asset name was still present in the 3 most recent releases (e.g. ShadowMountPlus where `1.6test8-fix1` was still in the recent-3 window alongside `1.6beta10`). The asset-name match found the old release, compared the tag to current, decided "no update" — even though a newer release tag existed. Both global and per-source checks now follow the same rule for single-payload repos: trust the newest release as the successor regardless of filename match.
 
