@@ -3,7 +3,7 @@
 // ── Payload Filters ──────────────────────────────────────────────
 const FILTER_DEFS = [
   { key: 'all',       label: 'All'           },
-  { key: 'favorites', label: '⭐ Favorites'  },
+  { key: 'favorites', label: '★ Favorites'  },
   { key: 'elf',       label: 'ELF'           },
   { key: 'lua',       label: 'LUA'           },
 ];

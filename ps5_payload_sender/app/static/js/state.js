@@ -30,7 +30,7 @@ const builder = { steps: [] };
 function initTheme() {
   const saved = sessionStorage.getItem('ps5_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
-  document.getElementById('btn-theme').textContent = saved === 'dark' ? '☀' : '🌙';
+  document.getElementById('btn-theme').innerHTML  = saved === 'dark' ? icon('sun') : icon('moon');
 }
 
 function toggleTheme() {
@@ -38,7 +38,7 @@ function toggleTheme() {
   const next = cur === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   sessionStorage.setItem('ps5_theme', next);
-  document.getElementById('btn-theme').textContent = next === 'dark' ? '☀' : '🌙';
+  document.getElementById('btn-theme').innerHTML  = next === 'dark' ? icon('sun') : icon('moon');
 }
 
 // ── Advanced Mode ─────────────────────────────────────────────────

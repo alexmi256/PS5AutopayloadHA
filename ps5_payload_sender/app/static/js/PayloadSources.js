@@ -58,7 +58,7 @@ function renderSourcesList() {
     if (updatesForRepo.length) {
       const upBadge = document.createElement('span');
       upBadge.className = 'source-update-badge';
-      upBadge.textContent = `⚠ ${updatesForRepo.length} update${updatesForRepo.length > 1 ? 's' : ''}`;
+      upBadge.innerHTML  = icon('alert-triangle') + ` ${updatesForRepo.length} update${updatesForRepo.length > 1 ? 's' : ''}`;
       upBadge.title = updatesForRepo
         .map(u => `${u.filename}: ${u.current_version} → ${u.latest_version}`)
         .join('\n');
@@ -77,7 +77,7 @@ function renderSourcesList() {
 
     const checkBtn = document.createElement('button');
     checkBtn.className = 'btn btn-sm source-check-btn';
-    checkBtn.textContent = '↻ Check';
+    checkBtn.innerHTML  = icon('refresh-cw') + ' Check';
     checkBtn.title = 'Check for new payloads and updates';
     checkBtn.addEventListener('click', () => checkSourceUpdates(src.repo, el));
 
@@ -149,7 +149,7 @@ function _openSourcePanel(prefill = null) {
   const fetchBtn = document.getElementById('btn-source-fetch');
   const saveBtn  = document.getElementById('btn-source-save');
   if (titleEl)  titleEl.textContent  = _editingSourceRepo ? 'Edit Source' : 'Add Source';
-  if (fetchBtn) fetchBtn.textContent = _editingSourceRepo ? '↻ Re-scan'   : 'Detect Payloads';
+  if (fetchBtn) fetchBtn.innerHTML  = _editingSourceRepo ? icon('refresh-cw') + ' Re-scan'   : 'Detect Payloads';
   if (saveBtn)  saveBtn.style.display = _editingSourceRepo ? '' : 'none';
 
   document.getElementById('source-detected').style.display = 'none';
@@ -575,11 +575,11 @@ async function checkSourceUpdates(repo, sourceEl) {
       errPanel.innerHTML = '';
       const err = document.createElement('div');
       err.className = 'source-check-status warn';
-      err.textContent = '⚠ Check failed: ' + e.message;
+      err.innerHTML  = icon('alert-triangle') + ' Check failed: ' + e.message;
       errPanel.appendChild(err);
       const closeBtn = document.createElement('button');
       closeBtn.className   = 'btn btn-sm';
-      closeBtn.textContent = '✕ Close';
+      closeBtn.innerHTML  = icon('x') + ' Close';
       closeBtn.style.cssText = 'margin-top:.35rem;width:100%';
       closeBtn.addEventListener('click', () => { errPanel.style.display = 'none'; });
       errPanel.appendChild(closeBtn);
@@ -587,7 +587,7 @@ async function checkSourceUpdates(repo, sourceEl) {
     }
   }
   finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Check'; }
+    if (btn) { btn.disabled = false; btn.innerHTML  = icon('refresh-cw') + ' Check'; }
   }
 }
 
@@ -601,7 +601,7 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
   if (updatesAvail)     parts.push(`${updatesAvail} update(s) available`);
   if (!parts.length)    parts.push(importedCount ? '✔ All up to date' : '✔ No payloads in this release');
   const hasWarning = newAssets.length > 0 || updatesAvail > 0;
-  statusLine.textContent = (hasWarning ? '⚠ ' : '') + parts.join(' · ');
+  statusLine.innerHTML  = (hasWarning ? icon('alert-triangle') + ' ' : '') + parts.join(' · ');
   statusLine.className   = 'source-check-status ' + (hasWarning ? 'warn' : 'ok');
   panel.appendChild(statusLine);
 
@@ -876,7 +876,7 @@ async function checkAllUpdates() {
     }
   } catch (e) { log('Check updates: ' + e.message, 'error'); }
   finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Check Updates'; }
+    if (btn) { btn.disabled = false; btn.innerHTML  = icon('refresh-cw') + ' Check Updates'; }
   }
 }
 
@@ -884,7 +884,7 @@ function _renderUpdateBadge(count) {
   const badge = document.getElementById('update-count-badge');
   if (!badge) return;
   if (count > 0) {
-    badge.textContent = `⚠ ${count} update${count > 1 ? 's' : ''} available`;
+    badge.innerHTML  = icon('alert-triangle') + ` ${count} update${count > 1 ? 's' : ''} available`;
     badge.className   = 'update-count-badge warn';
     document.getElementById('btn-update-all').style.display = '';
   } else {
