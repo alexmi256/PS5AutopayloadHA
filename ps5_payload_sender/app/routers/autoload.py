@@ -104,11 +104,38 @@ async def api_parse_profile(profile: str):
                 "interval_ms": d.interval_ms,
             })
         elif isinstance(d, WaitForLoaderDirective):
+            # Legacy `??9021 7200 30 1` flows carried their loader config
+            # on the step. The new model puts everything in the ~notify
+            # header — promote step-level overrides into notify_cfg here
+            # so the UI sees a single source of truth. Each axis is
+            # promoted independently: if the header already has an
+            # explicit non-default value, leave the step value in place
+            # (engine will still respect it).
+            out_port      = d.port
+            out_max_wait  = d.max_wait_seconds
+            out_interval  = d.interval_seconds
+            promoted = False
+            if d.port and notify_cfg.get("loader_port", 9021) == 9021:
+                notify_cfg["loader_port"] = d.port
+                out_port = 0
+                promoted = True
+            if d.max_wait_seconds and notify_cfg.get("loader_max_wait_s", 10800) == 10800:
+                notify_cfg["loader_max_wait_s"] = int(d.max_wait_seconds)
+                out_max_wait = 0
+                promoted = True
+            if d.interval_seconds and notify_cfg.get("loader_interval_s", 30) == 30:
+                notify_cfg["loader_interval_s"] = int(d.interval_seconds)
+                out_interval = 0
+                promoted = True
+            if promoted:
+                # Without this the migration would be silent — the step
+                # could land in a flow whose loader_ready was off.
+                notify_cfg["loader_ready"] = True
             steps.append({
                 "type": "wait_for_loader",
-                "port": d.port,
-                "max_wait_s": d.max_wait_seconds,
-                "interval_s": d.interval_seconds,
+                "port": out_port,
+                "max_wait_s": out_max_wait,
+                "interval_s": out_interval,
                 "stability_count": d.stability_count,
             })
         elif isinstance(d, NotifyDirective):
