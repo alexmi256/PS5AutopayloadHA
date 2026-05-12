@@ -229,18 +229,26 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                         break
 
             elif isinstance(d, WaitForLoaderDirective):
-                loader_port = d.port
+                # Resolve config: directive values take precedence (back-compat
+                # with legacy `??9021 7200 30 1` flows), header defaults
+                # otherwise (new-style flows save `??` alone).
+                eff_port      = d.port or int(notify_cfg.get("loader_port") or 9021)
+                eff_max_wait  = d.max_wait_seconds or float(notify_cfg.get("loader_max_wait_s") or 10800)
+                eff_interval  = d.interval_seconds or float(notify_cfg.get("loader_interval_s") or 30)
+                eff_stability = max(1, int(d.stability_count or 1))
+                loader_port   = eff_port
+
                 await manager.status(
-                    f"[{i}/{len(directives)}] WAIT FOR LOADER on port {d.port} "
-                    f"(max {_fmt_duration(d.max_wait_seconds)}, every {d.interval_seconds:.0f}s, "
-                    f"stability {d.stability_count}) …",
-                    waiting_port=d.port,
+                    f"[{i}/{len(directives)}] WAIT FOR LOADER on port {eff_port} "
+                    f"(max {_fmt_duration(eff_max_wait)}, every {eff_interval:.0f}s, "
+                    f"stability {eff_stability}) …",
+                    waiting_port=eff_port,
                 )
                 _log.info(
                     "WAIT FOR LOADER started: port=%s max_wait=%ss interval=%ss stability=%s host=%s",
-                    d.port, d.max_wait_seconds, d.interval_seconds, d.stability_count, req.host,
+                    eff_port, eff_max_wait, eff_interval, eff_stability, req.host,
                 )
-                connect_timeout = max(1.0, min(5.0, d.interval_seconds / 2))
+                connect_timeout = max(1.0, min(5.0, eff_interval / 2))
                 loop_start = asyncio.get_running_loop().time()
                 consecutive_ok = 0
                 reached = False
@@ -251,36 +259,36 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                         break
                     await _pause_event.wait()
                     poll += 1
-                    ok = await check_port(req.host, d.port, timeout=connect_timeout)
+                    ok = await check_port(req.host, eff_port, timeout=connect_timeout)
                     consecutive_ok = consecutive_ok + 1 if ok else 0
                     elapsed = asyncio.get_running_loop().time() - loop_start
                     _log.debug(
                         "WAIT FOR LOADER poll #%d port=%s ok=%s consecutive=%s elapsed=%.0fs",
-                        poll, d.port, ok, consecutive_ok, elapsed,
+                        poll, eff_port, ok, consecutive_ok, elapsed,
                     )
                     await manager.broadcast({
                         "type": "flow_wait_check",
-                        "port": d.port, "poll": poll,
+                        "port": eff_port, "poll": poll,
                         "ok": ok, "consecutive": consecutive_ok,
                         "elapsed_s": round(elapsed, 1),
-                        "max_wait_s": d.max_wait_seconds,
+                        "max_wait_s": eff_max_wait,
                     })
-                    if consecutive_ok >= d.stability_count:
+                    if consecutive_ok >= eff_stability:
                         reached = True
                         loader_wait_seconds = elapsed
                         _log.info(
                             "WAIT FOR LOADER detected: port=%s after %.1fs (%d consecutive)",
-                            d.port, elapsed, consecutive_ok,
+                            eff_port, elapsed, consecutive_ok,
                         )
                         await manager.status(
-                            f"Loader on port {d.port} reachable after "
+                            f"Loader on port {eff_port} reachable after "
                             f"{_fmt_duration(elapsed)} ✓",
                             level="success",
                         )
                         break
-                    if elapsed >= d.max_wait_seconds:
+                    if elapsed >= eff_max_wait:
                         break
-                    sleep_end = asyncio.get_running_loop().time() + d.interval_seconds
+                    sleep_end = asyncio.get_running_loop().time() + eff_interval
                     while asyncio.get_running_loop().time() < sleep_end:
                         if _stop_event.is_set():
                             break
@@ -294,7 +302,7 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                         await notifications.fire_if_enabled(
                             "loader_ready", notify_cfg,
                             message=(
-                                f"Host: {req.host}\nPort: {d.port}\n"
+                                f"Host: {req.host}\nPort: {eff_port}\n"
                                 f"Waited: {_fmt_duration(loader_wait_seconds or 0)}"
                             ),
                         )
@@ -303,9 +311,10 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                 else:
                     loader_timeout = True
                     loader_wait_seconds = asyncio.get_running_loop().time() - loop_start
+                    waited_min = round(eff_max_wait / 60)
                     loader_timeout_msg = (
-                        f"PS5 loader was not detected in time on port {d.port} "
-                        f"(waited {_fmt_duration(loader_wait_seconds)})"
+                        f"PS5 loader was not detected within {waited_min} minutes "
+                        f"on port {eff_port}"
                     )
                     _log.error("WAIT FOR LOADER timeout: %s", loader_timeout_msg)
                     await manager.status(loader_timeout_msg, level="error")

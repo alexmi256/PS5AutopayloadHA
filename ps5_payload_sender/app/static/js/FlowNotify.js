@@ -18,15 +18,30 @@ const FLOW_RESULT_LABEL = {
   stopped:        { text: 'stopped',         cls: 'p2jb-res-warn' },
 };
 
+const _FLOW_LOADER_FIELD_IDS = [
+  'flow-notify-ready', 'flow-loader-port', 'flow-loader-interval', 'flow-loader-timeout',
+];
+
 async function initFlowNotify() {
   // History
   await _flowHistoryRefresh();
   document.getElementById('btn-flow-clear-history')
     .addEventListener('click', _flowHistoryClear);
 
-  // Notify service validation
+  // Notify service validation + persistent-row visibility
   const svc = document.getElementById('flow-notify-service');
-  svc.addEventListener('input', _flowValidateService);
+  svc.addEventListener('input', () => {
+    _flowValidateService();
+    _flowUpdateLoaderUI();
+  });
+
+  // Loader-config visibility + warning are driven by the loader_ready toggle
+  // and by the contents of the builder. Wire up the relevant inputs.
+  _FLOW_LOADER_FIELD_IDS.forEach(id => {
+    document.getElementById(id)?.addEventListener('change', _flowUpdateLoaderUI);
+    document.getElementById(id)?.addEventListener('input',  _flowUpdateLoaderUI);
+  });
+  _flowUpdateLoaderUI();
 
   // Test buttons
   document.querySelectorAll('[data-flow-test]').forEach(btn => {
@@ -40,12 +55,21 @@ async function initFlowNotify() {
 
 // ─── Notify config read/apply (used by AutoLoadBuilder) ──────────
 function flowNotifyReadConfig() {
+  const intOr = (id, fallback) => {
+    const v = parseInt(document.getElementById(id).value, 10);
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  };
   return {
-    loader_ready:   document.getElementById('flow-notify-ready').checked,
-    flow_started:   document.getElementById('flow-notify-started').checked,
-    flow_completed: document.getElementById('flow-notify-completed').checked,
-    flow_failed:    document.getElementById('flow-notify-failed').checked,
-    service:        document.getElementById('flow-notify-service').value.trim(),
+    loader_ready:      document.getElementById('flow-notify-ready').checked,
+    flow_started:      document.getElementById('flow-notify-started').checked,
+    flow_completed:    document.getElementById('flow-notify-completed').checked,
+    flow_failed:       document.getElementById('flow-notify-failed').checked,
+    service:           document.getElementById('flow-notify-service').value.trim(),
+    persistent:        document.getElementById('flow-notify-persistent').checked,
+    loader_port:       intOr('flow-loader-port',     9021),
+    loader_interval_s: intOr('flow-loader-interval', 30),
+    // UI stores minutes — convert here.
+    loader_max_wait_s: intOr('flow-loader-timeout',  180) * 60,
   };
 }
 
@@ -56,20 +80,58 @@ function flowNotifyApplyConfig(cfg) {
   document.getElementById('flow-notify-completed').checked = cfg.flow_completed  !== false;
   document.getElementById('flow-notify-failed').checked    = cfg.flow_failed     !== false;
   document.getElementById('flow-notify-service').value     = cfg.service || '';
+  document.getElementById('flow-notify-persistent').checked = cfg.persistent  !== false;
+  if (cfg.loader_port)       document.getElementById('flow-loader-port').value     = cfg.loader_port;
+  if (cfg.loader_interval_s) document.getElementById('flow-loader-interval').value = cfg.loader_interval_s;
+  if (cfg.loader_max_wait_s) document.getElementById('flow-loader-timeout').value  = Math.round(cfg.loader_max_wait_s / 60);
   _flowValidateService();
+  _flowUpdateLoaderUI();
 }
 
 function flowNotifyRenderHeader(cfg) {
   // Render the same `# ~notify …` header the Python parser expects.
+  // Only include loader-config keys that differ from the defaults so
+  // simple flows stay tidy.
   const parts = [
     `loader_ready=${cfg.loader_ready ? 'on' : 'off'}`,
     `flow_started=${cfg.flow_started ? 'on' : 'off'}`,
     `flow_completed=${cfg.flow_completed ? 'on' : 'off'}`,
     `flow_failed=${cfg.flow_failed ? 'on' : 'off'}`,
   ];
+  if ((cfg.loader_port       || 9021)  !== 9021)  parts.push(`loader_port=${cfg.loader_port}`);
+  if ((cfg.loader_interval_s || 30)    !== 30)    parts.push(`loader_interval_s=${cfg.loader_interval_s}`);
+  if ((cfg.loader_max_wait_s || 10800) !== 10800) parts.push(`loader_max_wait_s=${cfg.loader_max_wait_s}`);
+  if (cfg.persistent === false) parts.push('persistent=off');
   if (cfg.service) parts.push(`service="${cfg.service}"`);
   return `# ~notify ${parts.join(' ')}`;
 }
+
+// Show/hide loader-config rows depending on the loader_ready toggle, and
+// flash the warning when loader notifications are enabled but the builder
+// has no WAIT FOR LOADER step yet.
+function _flowUpdateLoaderUI() {
+  const cfgRow  = document.getElementById('flow-loader-config');
+  const warn    = document.getElementById('flow-loader-warn');
+  const ready   = document.getElementById('flow-notify-ready');
+  if (!cfgRow || !ready) return;
+  cfgRow.style.display = ready.checked ? '' : 'none';
+
+  // Sync the persistent checkbox visibility — only relevant when a
+  // service is set (otherwise persistent is the only channel anyway).
+  const svc  = document.getElementById('flow-notify-service').value.trim();
+  const row  = document.getElementById('flow-notify-persistent-row');
+  if (row) row.style.display = svc ? '' : 'none';
+
+  // Builder-side warning: loader notifications need a ?? step in the flow.
+  const hasWfl = typeof builder !== 'undefined'
+    && Array.isArray(builder.steps)
+    && builder.steps.some(s => s.type === 'wait_for_loader');
+  if (warn) warn.style.display = (ready.checked && !hasWfl) ? '' : 'none';
+}
+
+// Exposed so AutoLoadBuilder can call it after every render (steps changed
+// → maybe a wait_for_loader step appeared or disappeared).
+window.flowNotifyRefreshWarn = _flowUpdateLoaderUI;
 
 // ─── Validation ──────────────────────────────────────────────────
 function _flowValidateService() {

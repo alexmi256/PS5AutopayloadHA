@@ -24,6 +24,8 @@ import asyncio
 import logging
 from typing import Any, Dict, Optional
 
+from functools import partial
+
 from ha_client import send_monitor_notification
 from websocket_manager import manager
 
@@ -63,10 +65,16 @@ async def fire(
     """
     title = EVENT_TITLES.get(event, event.replace("_", " ").title()) + title_suffix
     service = service_override or (notify_cfg.get("service") or None)
+    # Persistent default = True so callers that pass an old-style cfg
+    # (no key) keep getting persistent_notification.create. Set to False
+    # only when the user explicitly toggled it off in the flow header.
+    persistent = bool(notify_cfg.get("persistent", True))
     loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(
-            None, send_monitor_notification, title, message, service,
+            None,
+            partial(send_monitor_notification, title, message, service,
+                    persistent=persistent),
         )
         _log.info(
             "Flow notification dispatched: event=%s service=%s persistent=%s service_ok=%s",
@@ -109,10 +117,13 @@ async def fire_custom(
     """Send a notification with an arbitrary title/message (the
     `@notify` step). Always sends — there's no event gate."""
     service = service_override or (notify_cfg.get("service") or None)
+    persistent = bool(notify_cfg.get("persistent", True))
     loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(
-            None, send_monitor_notification, title, message, service,
+            None,
+            partial(send_monitor_notification, title, message, service,
+                    persistent=persistent),
         )
         _log.info("@notify step dispatched: service=%s persistent=%s service_ok=%s",
                   service or "<persistent only>",
@@ -164,9 +175,10 @@ async def test_notification(
 
     if event == "persistent":
         title = "PS5 Autopayload — persistent notification test"
-        # Force persistent-only by clearing the service for this single call.
+        # "Test persistent" specifically exercises the HA notification
+        # center path, regardless of how the flow has it configured.
         message = _build_test_message(event, host=host, port=port, flow=flow_name)
-        return await _dispatch_test(title, message, service=None, event=event)
+        return await _dispatch_test(title, message, service=None, persistent=True, event=event)
 
     if event == "service":
         svc = (notify_cfg.get("service") or "").strip()
@@ -177,28 +189,38 @@ async def test_notification(
             }
         title = f"PS5 Autopayload — {svc} test"
         message = _build_test_message(event, host=host, port=port, flow=flow_name)
-        return await _dispatch_test(title, message, service=svc, event=event)
+        # "Test custom notify service" specifically validates the
+        # notify.<service> hop — persistent is intentionally off so the
+        # user can isolate the failure.
+        return await _dispatch_test(title, message, service=svc, persistent=False, event=event)
 
+    # Real-event simulations honour the flow's persistent toggle.
     title = EVENT_TITLES[event] + " (test)"
     service = (notify_cfg.get("service") or None)
+    persistent = bool(notify_cfg.get("persistent", True))
     message = _build_test_message(event, host=host, port=port, flow=flow_name)
-    return await _dispatch_test(title, message, service=service, event=event)
+    return await _dispatch_test(title, message, service=service,
+                                persistent=persistent, event=event)
 
 
 async def _dispatch_test(
     title: str, message: str, service: Optional[str], event: str,
+    *, persistent: bool = True,
 ) -> Dict[str, Any]:
     loop = asyncio.get_running_loop()
-    _log.info("Flow Notification: Test started — event=%s service=%s",
-              event, service or "<persistent only>")
+    _log.info("Flow Notification: Test started — event=%s service=%s persistent=%s",
+              event, service or "<none>", persistent)
     try:
         result = await loop.run_in_executor(
-            None, send_monitor_notification, title, message, service,
+            None,
+            partial(send_monitor_notification, title, message, service,
+                    persistent=persistent),
         )
-        # success means: persistent worked AND (no service OR service worked)
-        success = bool(result.get("persistent")) and (
-            service is None or bool(result.get("service"))
-        )
+        # success := every channel the caller asked for came back True.
+        pn_ok  = result.get("persistent")
+        svc_ok = result.get("service")
+        success = ((not persistent) or pn_ok is True) and \
+                  ((service is None) or svc_ok is True)
         if success:
             _log.info("Flow Notification: Test sent successfully (%s)", event)
         else:
@@ -206,16 +228,21 @@ async def _dispatch_test(
                 "Flow Notification: %s test failed (persistent=%s service=%s)",
                 event, result.get("persistent"), result.get("service"),
             )
+        if success:
+            err = None
+        elif service and svc_ok is False:
+            err = f"notify.{service} unreachable"
+        elif persistent and pn_ok is False:
+            err = "persistent notification failed"
+        else:
+            err = "no delivery channel succeeded"
         return {
             "success":    success,
             "event":      event,
             "title":      title,
-            "persistent": bool(result.get("persistent")),
-            "service":    result.get("service"),
-            "error":      None if success else (
-                f"notify.{service} unreachable" if service
-                else "persistent notification failed"
-            ),
+            "persistent": pn_ok,
+            "service":    svc_ok,
+            "error":      err,
         }
     except Exception as exc:
         _log.exception("Flow Notification: Test exception: %s", exc)
@@ -252,10 +279,14 @@ async def simulate_loader_ready(
         "loader_ready", notify_cfg,
         title_suffix=" (simulated)", message=message,
     )
+    persistent_enabled = bool(notify_cfg.get("persistent", True))
+    service_set        = bool(result.get("service") is not None)
+    pn_ok              = result.get("persistent")
+    svc_ok             = result.get("service")
+    success = ((not persistent_enabled) or pn_ok is True) and \
+              ((not service_set) or svc_ok is True)
     return {
-        "success":   bool(result.get("persistent")) and (
-            not result.get("service") or result.get("service") is True
-        ),
+        "success":   success,
         "event":     "loader_ready",
         "simulated": True,
         "notified":  True,

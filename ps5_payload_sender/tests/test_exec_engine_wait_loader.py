@@ -158,7 +158,7 @@ def test_wait_for_loader_timeout_fails_flow(tmp_profile, patched_io, tmp_history
     # History records failed_timeout
     runs = flow_history.get_runs()
     assert runs[0]["result"] == "failed_timeout"
-    assert "not detected in time" in runs[0]["error"]
+    assert "not detected within" in runs[0]["error"]
 
 
 def test_wait_for_loader_requires_stability(tmp_profile, patched_io, tmp_history):
