@@ -166,6 +166,47 @@
           <button id="btn-p2jb-start" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg> Monitor P2JB</button>
           <button id="btn-p2jb-stop"  class="btn btn-danger" style="display:none"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg> Stop monitor</button>
         </div>
+
+        <!-- Recent runs -->
+        <div class="p2jb-history-block">
+          <div class="p2jb-history-head">
+            <span class="field-label">Recent P2JB runs</span>
+            <button id="btn-p2jb-clear-history" class="btn btn-ghost btn-sm" title="Clear history">Clear</button>
+          </div>
+          <ul id="p2jb-history-list" class="p2jb-history-list">
+            <li class="p2jb-history-empty">No runs yet.</li>
+          </ul>
+        </div>
+
+        <!-- Advanced: notification tests + simulation -->
+        <div class="p2jb-advanced advanced-only">
+          <div class="field-label" style="display:flex; align-items:center; gap:.4rem">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+            Advanced — Notification &amp; simulation tests
+          </div>
+          <p class="qs-subtitle" style="margin:.25rem 0 .55rem">
+            These buttons do <strong>not</strong> start a real monitor. They
+            simulate the event and fire the configured notification path so
+            you can validate Home Assistant routes.
+          </p>
+          <div class="p2jb-test-grid">
+            <button class="btn btn-secondary btn-sm" data-p2jb-test="loader_ready">Test loader-ready</button>
+            <button class="btn btn-secondary btn-sm" data-p2jb-test="flow_started">Test flow-started</button>
+            <button class="btn btn-secondary btn-sm" data-p2jb-test="flow_completed">Test flow-completed</button>
+            <button class="btn btn-secondary btn-sm" data-p2jb-test="flow_failed">Test flow-failed</button>
+          </div>
+          <div class="section-actions" style="margin-top:.55rem">
+            <button id="btn-p2jb-simulate" class="btn btn-warn btn-sm">Simulate Loader Ready</button>
+          </div>
+          <label class="checkbox-label p2jb-test-realflow">
+            <input type="checkbox" id="p2jb-test-realflow" />
+            <span>Also run the selected flow after simulated loader ready</span>
+          </label>
+          <p id="p2jb-test-realflow-warn" class="p2jb-test-warn" style="display:none">
+            ⚠ This will run the selected flow <strong>for real</strong>
+            against the configured PS5 IP. Use with care.
+          </p>
+        </div>
       </div>
     </section>
 

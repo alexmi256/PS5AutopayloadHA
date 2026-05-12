@@ -33,3 +33,12 @@ def tmp_flow_runs_file(tmp_path, monkeypatch):
     f = tmp_path / "flow_runs.json"
     monkeypatch.setattr(flow_analysis, "FLOW_RUNS_FILE", f)
     return f
+
+
+@pytest.fixture
+def tmp_p2jb_history_file(tmp_path, monkeypatch):
+    """Redirect p2jb_history's storage file to a fresh tmp file."""
+    import p2jb_history
+    f = tmp_path / "p2jb_history.json"
+    monkeypatch.setattr(p2jb_history, "P2JB_HISTORY_FILE", f)
+    return f

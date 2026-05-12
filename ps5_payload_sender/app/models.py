@@ -120,3 +120,19 @@ class P2JBMonitorConfig(BaseModel):
     notify_flow_failed: bool = True
     # Optional notify.<service> on top of persistent_notification
     notify_service: Optional[str] = None
+
+
+class P2JBTestRequest(BaseModel):
+    """Body for /api/p2jb/test — Advanced-Mode notification + simulation."""
+    event: str                                # one of the keys below
+    host: str = ""                            # for nicer test bodies
+    elf_port: int = 9021
+    flow_name: Optional[str] = None
+    notify_service: Optional[str] = None
+    # Only relevant for event="simulate_loader_ready":
+    run_real_flow: bool = False
+    # Pass the full notify-toggle set so simulation respects user choices
+    notify_loader_ready: bool = True
+    notify_flow_started: bool = False
+    notify_flow_completed: bool = True
+    notify_flow_failed: bool = True

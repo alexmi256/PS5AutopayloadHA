@@ -23,6 +23,7 @@ from config import (
     OLD_PAYLOAD_DIR,
     OLD_STATE_FILE,
     P2JB_CONFIG_FILE,
+    P2JB_HISTORY_FILE,
     PAYLOAD_DIR,
     PAYLOAD_META_FILE,
     PROFILES_DIR,
@@ -410,7 +411,7 @@ def reset_config() -> dict:
     # Wipe config JSON files
     for cfg_f in (SOURCES_FILE, STATE_FILE, DEVICES_FILE,
                   PAYLOAD_META_FILE, TIMING_FILE, FLOW_RUNS_FILE,
-                  P2JB_CONFIG_FILE):
+                  P2JB_CONFIG_FILE, P2JB_HISTORY_FILE):
         if cfg_f.exists():
             cfg_f.unlink()
 
