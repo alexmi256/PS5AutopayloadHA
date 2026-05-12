@@ -28,13 +28,15 @@ async function initP2JBMonitor() {
   // Pre-fill flow dropdown from saved profiles (refreshed on each open)
   await _p2jbRefreshFlowOptions();
 
-  // Pull persisted config and current status in parallel
-  const [cfg, status] = await Promise.all([
+  // Pull persisted config, current status, and history in parallel
+  const [cfg, status, history] = await Promise.all([
     api('/api/p2jb/config').catch(() => ({})),
     api('/api/p2jb/status').catch(() => ({ state: 'idle' })),
+    api('/api/p2jb/history').catch(() => ({ runs: [] })),
   ]);
   _p2jbApplyConfig(cfg || {});
   _p2jbApplyStatus(status);
+  _p2jbRenderHistory(history.runs || []);
 
   // Wire up buttons
   document.getElementById('btn-p2jb-start').addEventListener('click', startP2JB);
@@ -44,6 +46,18 @@ async function initP2JBMonitor() {
 
   document.getElementById('p2jb-lua-enable').addEventListener('change', _p2jbToggleLuaPort);
   _p2jbToggleLuaPort();
+
+  document.getElementById('btn-p2jb-clear-history')
+    .addEventListener('click', _p2jbClearHistory);
+
+  // Advanced test panel
+  document.querySelectorAll('[data-p2jb-test]').forEach(btn => {
+    btn.addEventListener('click', () => _p2jbTest(btn.dataset.p2jbTest));
+  });
+  document.getElementById('btn-p2jb-simulate')
+    .addEventListener('click', _p2jbSimulate);
+  document.getElementById('p2jb-test-realflow')
+    .addEventListener('change', _p2jbToggleRealFlowWarn);
 }
 
 async function _p2jbRefreshFlowOptions() {
@@ -149,6 +163,10 @@ async function stopP2JB() {
 function handleP2JBEvent(msg) {
   if (msg.type === 'p2jb_state') {
     _p2jbApplyStatus(msg);
+    // After a terminal transition, refresh the history list.
+    if (['completed','failed','timeout','stopped','loader_ready'].includes(msg.state)) {
+      _p2jbRefreshHistory();
+    }
     return;
   }
   if (msg.type === 'p2jb_check') {
@@ -157,6 +175,19 @@ function handleP2JBEvent(msg) {
       const cfg = _p2jbReadConfig();
       sub.textContent = `Checking port ${cfg.elf_port} · poll #${msg.poll} · ${msg.elapsed_s}s elapsed`;
     }
+    return;
+  }
+  if (msg.type === 'p2jb_simulation') {
+    const sub = document.getElementById('p2jb-status-sub');
+    if (sub) sub.textContent = `Loader ready simulation · ${msg.host}:${msg.port}`;
+    const pill = document.getElementById('p2jb-status-pill');
+    const label = document.getElementById('p2jb-status-label');
+    if (pill && label) {
+      pill.className = 'p2jb-pill p2jb-pill-ok';
+      label.textContent = 'Loader ready (sim)';
+    }
+    // Auto-revert after 4s so the real status reappears
+    setTimeout(() => api('/api/p2jb/status').then(_p2jbApplyStatus), 4000);
   }
 }
 
@@ -191,6 +222,141 @@ function _p2jbApplyStatus(status) {
   _p2jbActive = !!status.active;
   btnGo.style.display   = _p2jbActive ? 'none' : '';
   btnStop.style.display = _p2jbActive ? ''     : 'none';
+}
+
+// ─── History list ────────────────────────────────────────────────
+const P2JB_RESULT_LABEL = {
+  completed:    { text: 'completed',    cls: 'p2jb-res-ok'   },
+  loader_ready: { text: 'loader ready', cls: 'p2jb-res-ok'   },
+  failed:       { text: 'failed',       cls: 'p2jb-res-err'  },
+  timeout:      { text: 'timeout',      cls: 'p2jb-res-err'  },
+  stopped:      { text: 'stopped',      cls: 'p2jb-res-warn' },
+};
+
+function _p2jbFmtTimestamp(unix_s) {
+  if (!unix_s) return '?';
+  const d = new Date(unix_s * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} `
+       + `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function _p2jbFmtWaited(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}h ${String(m).padStart(2,'0')}m`;
+  if (m) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${sec}s`;
+}
+
+function _p2jbRenderHistory(runs) {
+  const list = document.getElementById('p2jb-history-list');
+  if (!list) return;
+  if (!runs || !runs.length) {
+    list.innerHTML = '<li class="p2jb-history-empty">No runs yet.</li>';
+    return;
+  }
+  list.innerHTML = runs.map(r => {
+    const res    = P2JB_RESULT_LABEL[r.result] || { text: r.result, cls: '' };
+    const name   = r.ps5_name ? `${r.ps5_name} (${r.host})` : r.host;
+    const flow   = r.flow_name || (r.auto_run ? '(no flow)' : 'notify only');
+    const errTxt = r.error ? ` — ${r.error}` : '';
+    return `<li class="p2jb-history-item">
+      <span class="p2jb-history-date">${_p2jbFmtTimestamp(r.started_at)}</span>
+      <span class="p2jb-history-waited">${_p2jbFmtWaited(r.waited_s)}</span>
+      <span class="p2jb-history-result ${res.cls}">${res.text}</span>
+      <span class="p2jb-history-flow">${flow}</span>
+      <span class="p2jb-history-host" title="${name}">${name}</span>
+      ${errTxt ? `<span class="p2jb-history-err">${errTxt}</span>` : ''}
+    </li>`;
+  }).join('');
+}
+
+async function _p2jbRefreshHistory() {
+  try {
+    const r = await api('/api/p2jb/history');
+    _p2jbRenderHistory(r.runs || []);
+  } catch (_) { /* ignore */ }
+}
+
+async function _p2jbClearHistory() {
+  if (!confirm('Clear monitor run history?')) return;
+  try {
+    await api('/api/p2jb/history', { method: 'DELETE' });
+    _p2jbRenderHistory([]);
+    log('P2JB monitor history cleared', 'info');
+  } catch (e) {
+    log('Could not clear history: ' + e.message, 'error');
+  }
+}
+
+// ─── Advanced — test buttons / simulation ────────────────────────
+function _p2jbTestBody(extra = {}) {
+  const cfg = _p2jbReadConfig();
+  return {
+    host:                  cfg.host,
+    elf_port:              cfg.elf_port,
+    flow_name:             cfg.flow_name || null,
+    notify_service:        cfg.notify_service || null,
+    notify_loader_ready:   cfg.notify_loader_ready,
+    notify_flow_started:   cfg.notify_flow_started,
+    notify_flow_completed: cfg.notify_flow_completed,
+    notify_flow_failed:    cfg.notify_flow_failed,
+    ...extra,
+  };
+}
+
+async function _p2jbTest(event) {
+  try {
+    const r = await api('/api/p2jb/test', {
+      method: 'POST',
+      body: _p2jbTestBody({ event }),
+    });
+    if (r.success) {
+      log(`Test notification sent successfully (${event})`, 'success');
+    } else {
+      log(`Notification test failed. Check notify service. ${r.error || ''}`, 'error');
+    }
+  } catch (e) {
+    log('Test notification failed: ' + e.message, 'error');
+  }
+}
+
+async function _p2jbSimulate() {
+  const runReal = document.getElementById('p2jb-test-realflow').checked;
+  const cfg = _p2jbReadConfig();
+  if (runReal) {
+    if (!cfg.flow_name) {
+      log('Select a flow before enabling real-flow simulation', 'error');
+      return;
+    }
+    if (!confirm('This will run the selected flow FOR REAL against '
+               + cfg.host + '. Continue?')) {
+      return;
+    }
+  }
+  try {
+    const r = await api('/api/p2jb/test', {
+      method: 'POST',
+      body: _p2jbTestBody({ event: 'simulate_loader_ready', run_real_flow: runReal }),
+    });
+    if (r.success) {
+      log(r.ran_flow
+            ? `Simulated loader ready + ran flow (${r.event})`
+            : 'Loader-ready simulation sent', 'success');
+    } else {
+      log(`Simulation failed: ${r.error || r.event}`, 'error');
+    }
+  } catch (e) {
+    log('Simulation failed: ' + e.message, 'error');
+  }
+}
+
+function _p2jbToggleRealFlowWarn() {
+  const on = document.getElementById('p2jb-test-realflow').checked;
+  document.getElementById('p2jb-test-realflow-warn').style.display = on ? '' : 'none';
 }
 
 window.initP2JBMonitor = initP2JBMonitor;
