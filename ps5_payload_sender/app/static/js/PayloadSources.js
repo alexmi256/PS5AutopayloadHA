@@ -545,13 +545,18 @@ async function checkSourceUpdates(repo, sourceEl) {
       .filter(([name]) => !importedAssets.has(name) && !usedAsUpdate.has(name))
       .map(([name, vers]) => ({ name, latest: vers[0], versions: vers }));
     _renderUpdateBadge(Object.keys(state.updateResults).length);
+    // renderSourcesList() rebuilds .source-item nodes, so the panel reference
+    // captured above would be detached after it runs. Re-query the freshly
+    // rendered panel before populating, otherwise the panel never appears.
     renderSourcesList();
+    const freshEl    = document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
+    const freshPanel = freshEl && freshEl.querySelector('.source-check-panel');
     if (updatesAvail) renderPayloads();
 
-    if (panel) {
+    if (freshPanel) {
       const repoUpdates = Object.values(state.updateResults).filter(u => u.repo === repo);
-      _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, owned.length);
-      panel.style.display = '';
+      _populateSourceCheckPanel(freshPanel, repo, newAssets, repoUpdates, owned.length);
+      freshPanel.style.display = '';
     }
 
     const parts = [];
@@ -561,19 +566,24 @@ async function checkSourceUpdates(repo, sourceEl) {
     showToast(parts.join(' · '));
   } catch (e) {
     log('Check source: ' + e.message, 'error');
-    if (panel) {
-      panel.innerHTML = '';
+    // Same caveat as in the success path: if renderSourcesList() ran before
+    // throwing, the original panel reference is now detached. Prefer the
+    // freshly-rendered node when available.
+    const errEl    = document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`) || el;
+    const errPanel = (errEl && errEl.querySelector('.source-check-panel')) || panel;
+    if (errPanel) {
+      errPanel.innerHTML = '';
       const err = document.createElement('div');
       err.className = 'source-check-status warn';
       err.textContent = '⚠ Check failed: ' + e.message;
-      panel.appendChild(err);
+      errPanel.appendChild(err);
       const closeBtn = document.createElement('button');
       closeBtn.className   = 'btn btn-sm';
       closeBtn.textContent = '✕ Close';
       closeBtn.style.cssText = 'margin-top:.35rem;width:100%';
-      closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
-      panel.appendChild(closeBtn);
-      panel.style.display = '';
+      closeBtn.addEventListener('click', () => { errPanel.style.display = 'none'; });
+      errPanel.appendChild(closeBtn);
+      errPanel.style.display = '';
     }
   }
   finally {
