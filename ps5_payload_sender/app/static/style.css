@@ -993,6 +993,13 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   .header-adv-label { display: none }
   .header-actions { gap: .22rem }
 
+  /* Header row 2 (subtitle + version + actions) gets too tight on
+     narrow phones — the version badge ends up overlapping the
+     Advanced slider. Stack the two halves on their own line each. */
+  .header-row-sub { flex-direction: column; align-items: stretch; gap: .3rem }
+  .header-row-sub .header-meta { justify-content: space-between }
+  .header-row-sub .header-actions { justify-content: flex-end; flex-wrap: wrap }
+
   .main { padding: .65rem }
   .card { padding: .75rem .85rem }
 
@@ -1007,8 +1014,18 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   /* Reduce btn-xl size slightly */
   .btn-xl { padding: .6rem 1rem; font-size: .92rem }
 
-  /* Profile list buttons: allow wrapping */
-  .profile-item { flex-wrap: wrap }
+  /* Payload Sources: stack the name row above the action buttons so
+     `repo/payload-name` gets the full width and Check/Edit/Delete
+     wrap to a clean second line instead of competing with truncated
+     text. */
+  .source-main-row { flex-direction: column; align-items: stretch; gap: .35rem }
+  .source-btns     { justify-content: flex-end; flex-wrap: wrap }
+  .source-btns .btn { flex: 1 1 auto; min-width: 0 }
+
+  /* Saved Flows: same idea — name on its own line, buttons below.
+     Pin-to-quick-start button gets cramped otherwise. */
+  .profile-item    { flex-wrap: wrap; row-gap: .35rem }
+  .profile-name    { flex: 1 1 100%; min-width: 0 }
 
   /* Quick Start tiles: allow smaller */
   .qs-tile-label { max-width: 130px }
