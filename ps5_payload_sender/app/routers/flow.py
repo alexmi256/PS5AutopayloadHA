@@ -25,30 +25,30 @@ async def api_flow_analyze(req: FlowAnalyzeRequest):
     if not req.steps:
         raise HTTPException(400, "No steps to analyze")
 
-    run_start   = asyncio.get_event_loop().time()
+    loop = asyncio.get_running_loop()
+    run_start   = loop.time()
     wall_start  = time.time()
     steps_out: list = []
 
     for step in req.steps:
-        step_t0  = asyncio.get_event_loop().time()
+        step_t0  = loop.time()
         offset_s = round(step_t0 - run_start, 2)
 
         if step.type == "wait_port":
             interval_s = max(0.1, step.interval_ms / 1000)
-            t0 = asyncio.get_event_loop().time()
+            t0 = loop.time()
             reached = False
-            while asyncio.get_event_loop().time() - t0 < step.timeout:
+            while loop.time() - t0 < step.timeout:
                 if await check_port(req.host, step.port, timeout=2.0):
                     reached = True
                     break
                 await asyncio.sleep(interval_s)
-            dur_ms = int((asyncio.get_event_loop().time() - step_t0) * 1000)
+            dur_ms = int((loop.time() - step_t0) * 1000)
             steps_out.append({
                 "type": "wait_port", "port": step.port,
                 "reached": reached, "duration_ms": dur_ms, "offset_s": offset_s,
             })
             if reached:
-                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(executor, port_timing.record, step.port, dur_ms, "", "")
 
         elif step.type == "delay":
@@ -69,14 +69,14 @@ async def api_flow_analyze(req: FlowAnalyzeRequest):
                 })
             else:
                 result  = await send_payload(req.host, eff_port, step.filename)
-                dur_ms  = int((asyncio.get_event_loop().time() - step_t0) * 1000)
+                dur_ms  = int((loop.time() - step_t0) * 1000)
                 steps_out.append({
                     "type": "payload", "filename": step.filename, "port": eff_port,
                     "safe_mode": False, "success": result.get("success"),
                     "duration_ms": dur_ms, "offset_s": offset_s,
                 })
 
-    total_ms = int((asyncio.get_event_loop().time() - run_start) * 1000)
+    total_ms = int((loop.time() - run_start) * 1000)
     run = {
         "id":         int(wall_start * 1000),
         "started_at": wall_start,
@@ -84,7 +84,6 @@ async def api_flow_analyze(req: FlowAnalyzeRequest):
         "safe_mode":  req.safe_mode,
         "steps":      steps_out,
     }
-    loop = asyncio.get_running_loop()
     await loop.run_in_executor(executor, flow_analysis.record_run, run)
     return {"run": run}
 

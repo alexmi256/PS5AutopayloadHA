@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
@@ -86,7 +86,7 @@ async def api_export_logs(request: Request):
         content = "\n".join(lines).encode()
         mime, ext = "text/plain", "txt"
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%d-%H%M")
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
     filename = f"ps5-autopayload-log-{stamp}.{ext}"
     return Response(
         content=content,
