@@ -25,14 +25,18 @@ def fake_notifier(monkeypatch):
     state = {"result": {"persistent": True, "service": True}}
     calls = []
 
-    def _send(title, message, service):
-        calls.append({"title": title, "message": message, "service": service})
+    def _send(title, message, service, *, persistent=True):
+        calls.append({
+            "title": title, "message": message,
+            "service": service, "persistent_requested": persistent,
+        })
         r = dict(state["result"])
+        # Mirror real ha_client.send_monitor_notification behavior:
+        # persistent=False ⇒ the persistent channel is skipped entirely
+        # (returned as None, not True/False).
+        r["persistent"] = r.get("persistent") if persistent else None
         if service is None:
-            r.pop("service", None)
             r["service"] = None
-        elif r.get("service") is True:
-            r["service"] = True
         return r
 
     monkeypatch.setattr(notifications, "send_monitor_notification", _send)

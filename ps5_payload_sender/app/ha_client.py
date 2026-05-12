@@ -241,15 +241,23 @@ def send_notify_service(service: str, title: str, message: str) -> bool:
 
 def send_monitor_notification(
     title: str, message: str, notify_service: Optional[str] = None,
+    *, persistent: bool = True,
 ) -> dict:
-    """Always create a persistent notification; optionally also call notify.<service>.
+    """Create an HA persistent_notification by default and optionally also
+    call notify.<service>. ``persistent`` can be turned off so a service
+    target receives the notification without a duplicate appearing in
+    HA's notification center.
 
-    Returns {"persistent": bool, "service": bool | None} so callers can log results.
+    Returns ``{"persistent": bool | None, "service": bool | None}``.
     """
-    pn_ok = send_persistent_notification(title, message)
+    pn_ok: Optional[bool] = None
+    if persistent:
+        pn_ok = send_persistent_notification(title, message)
     svc_ok: Optional[bool] = None
     if notify_service:
         svc_ok = send_notify_service(notify_service, title, message)
+    if pn_ok is None and svc_ok is None:
+        _log.warning("Notification dispatched with no delivery channel enabled")
     _log.info("Monitor notification sent: persistent=%s service=%s", pn_ok, svc_ok)
     return {"persistent": pn_ok, "service": svc_ok}
 

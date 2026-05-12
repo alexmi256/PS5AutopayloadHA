@@ -236,6 +236,96 @@
         <span class="collapse-summary" id="summary-builder"></span>
       </div>
       <div class="collapse-body">
+        <details class="flow-notify-block" id="flow-notify-card">
+          <summary>Flow Notifications</summary>
+          <div class="flow-notify-body">
+            <div class="field-label">Notify when</div>
+            <div class="p2jb-notif-grid">
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-ready"     checked /> Loader / port ready</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Flow completed</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-failed"    checked /> Timeout / failure</label>
+              <label class="checkbox-label advanced-only"><input type="checkbox" id="flow-notify-started" /> Flow started (advanced)</label>
+            </div>
+
+            <!-- Loader-watch config — only relevant when loader_ready is enabled -->
+            <div id="flow-loader-config" class="flow-loader-cfg">
+              <div class="field-label" style="margin-top:.6rem">Loader watch (used by the WAIT FOR LOADER step)</div>
+              <div class="p2jb-grid">
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-port">Port to watch</label>
+                  <input type="number" id="flow-loader-port" class="input"
+                    value="9021" min="1" max="65535" />
+                  <small class="field-hint">9021 = ELF loader</small>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-interval">Check interval (s)</label>
+                  <input type="number" id="flow-loader-interval" class="input"
+                    value="30" min="5" max="600" />
+                  <small class="field-hint">Minimum 5 seconds</small>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-timeout">Timeout after (min)</label>
+                  <input type="number" id="flow-loader-timeout" class="input"
+                    value="180" min="1" max="1440" />
+                  <small class="field-hint">Flow fails after this</small>
+                </div>
+              </div>
+              <p id="flow-loader-warn" class="p2jb-test-warn" style="display:none">
+                ⚠ Loader notification requires a <strong>WAIT FOR LOADER</strong> step in the flow.
+              </p>
+            </div>
+
+            <div class="field-group" style="margin-top:.5rem">
+              <label class="field-label" for="flow-notify-service">
+                Notification target (optional)
+              </label>
+              <input id="flow-notify-service" class="input"
+                placeholder="notify.mobile_app_your_phone" />
+              <small id="flow-notify-service-err" class="p2jb-test-warn" style="display:none">
+                Service must start with <code>notify.</code>
+              </small>
+              <small class="field-hint">
+                Leave empty to use the Home Assistant notification center only.
+              </small>
+            </div>
+
+            <label class="checkbox-label" id="flow-notify-persistent-row" style="margin-top:.4rem">
+              <input type="checkbox" id="flow-notify-persistent" checked />
+              <span>Also create HA persistent notification</span>
+            </label>
+
+            <!-- Advanced: notification tests -->
+            <div class="p2jb-advanced advanced-only">
+              <div class="field-label" style="display:flex; align-items:center; gap:.4rem">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                Advanced — Test notification routing
+              </div>
+              <p class="qs-subtitle" style="margin:.25rem 0 .55rem">
+                These buttons send a sample notification through the current
+                notify config. They do <strong>not</strong> start a flow.
+              </p>
+              <div class="p2jb-test-grid">
+                <button class="btn btn-secondary btn-sm" data-flow-test="persistent">Test persistent notification</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="service">Test custom notify service</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="loader_ready">Test loader-ready</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="flow_completed">Test flow-completed</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="flow_failed">Test flow-failed</button>
+              </div>
+              <div class="section-actions" style="margin-top:.55rem">
+                <button id="btn-flow-simulate" class="btn btn-warn btn-sm">Simulate Loader Ready</button>
+              </div>
+              <label class="checkbox-label p2jb-test-realflow">
+                <input type="checkbox" id="flow-test-realflow" />
+                <span>Run the selected/current flow after simulated loader ready</span>
+              </label>
+              <p id="flow-test-realflow-warn" class="p2jb-test-warn" style="display:none">
+                ⚠ This will run the saved flow <strong>for real</strong>
+                against the configured PS5 IP. Use with care.
+              </p>
+            </div>
+          </div>
+        </details>
+
 
         <div class="builder-presets">
           <button id="btn-preset-p2jb" class="btn btn-sm btn-secondary"
@@ -375,58 +465,6 @@
         </div>
 
         <!-- Per-flow notification config -->
-        <details class="flow-notify-block" id="flow-notify-card">
-          <summary>Notifications &amp; Home Assistant routing</summary>
-          <div class="flow-notify-body">
-            <div class="field-label">Notify when</div>
-            <div class="p2jb-notif-grid">
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-ready"     checked /> Notify when loader becomes ready</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Notify when flow finishes</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-failed"    checked /> Notify on timeout / failure</label>
-              <label class="checkbox-label advanced-only"><input type="checkbox" id="flow-notify-started" /> Notify when flow starts (advanced)</label>
-            </div>
-            <div class="field-group" style="margin-top:.5rem">
-              <label class="field-label" for="flow-notify-service">
-                <code>notify.&lt;service&gt;</code> target (optional)
-              </label>
-              <input id="flow-notify-service" class="input"
-                placeholder="notify.mobile_app_your_phone (leave empty for HA notification center only)" />
-              <small id="flow-notify-service-err" class="p2jb-test-warn" style="display:none">
-                Service must start with <code>notify.</code>
-              </small>
-            </div>
-
-            <!-- Advanced: notification tests -->
-            <div class="p2jb-advanced advanced-only">
-              <div class="field-label" style="display:flex; align-items:center; gap:.4rem">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                Advanced — Test notification routing
-              </div>
-              <p class="qs-subtitle" style="margin:.25rem 0 .55rem">
-                These buttons send a sample notification through the current
-                notify config. They do <strong>not</strong> start a flow.
-              </p>
-              <div class="p2jb-test-grid">
-                <button class="btn btn-secondary btn-sm" data-flow-test="persistent">Test persistent notification</button>
-                <button class="btn btn-secondary btn-sm" data-flow-test="service">Test custom notify service</button>
-                <button class="btn btn-secondary btn-sm" data-flow-test="loader_ready">Test loader-ready</button>
-                <button class="btn btn-secondary btn-sm" data-flow-test="flow_completed">Test flow-completed</button>
-                <button class="btn btn-secondary btn-sm" data-flow-test="flow_failed">Test flow-failed</button>
-              </div>
-              <div class="section-actions" style="margin-top:.55rem">
-                <button id="btn-flow-simulate" class="btn btn-warn btn-sm">Simulate Loader Ready</button>
-              </div>
-              <label class="checkbox-label p2jb-test-realflow">
-                <input type="checkbox" id="flow-test-realflow" />
-                <span>Run the selected/current flow after simulated loader ready</span>
-              </label>
-              <p id="flow-test-realflow-warn" class="p2jb-test-warn" style="display:none">
-                ⚠ This will run the saved flow <strong>for real</strong>
-                against the configured PS5 IP. Use with care.
-              </p>
-            </div>
-          </div>
-        </details>
 
         <hr class="divider" />
 

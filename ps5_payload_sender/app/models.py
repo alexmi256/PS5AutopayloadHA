@@ -125,11 +125,18 @@ class PatchFlowVersionsRequest(BaseModel):
 class FlowNotifyConfig(BaseModel):
     """Per-flow notification preferences (matches the ``# ~notify …``
     header in the saved profile)."""
-    loader_ready:   bool = True
-    flow_started:   bool = False
-    flow_completed: bool = True
-    flow_failed:    bool = True
-    service:        str  = ""           # must start with "notify." if set
+    # Event toggles
+    loader_ready:      bool = True
+    flow_started:      bool = False
+    flow_completed:    bool = True
+    flow_failed:       bool = True
+    # Delivery
+    service:           str  = ""            # must start with "notify." if set
+    persistent:        bool = True          # HA notification center
+    # Loader-watch config (also used as defaults for ?? steps with no params)
+    loader_port:       int  = 9021
+    loader_interval_s: int  = 30
+    loader_max_wait_s: int  = 10800         # 3 h
 
     @field_validator("service")
     @classmethod
@@ -138,6 +145,27 @@ class FlowNotifyConfig(BaseModel):
         if v and not v.startswith("notify."):
             raise ValueError("notify service must start with 'notify.'")
         return v
+
+    @field_validator("loader_port")
+    @classmethod
+    def _port_in_range(cls, v: int) -> int:
+        if not (1 <= int(v) <= 65535):
+            raise ValueError("loader_port must be between 1 and 65535")
+        return int(v)
+
+    @field_validator("loader_interval_s")
+    @classmethod
+    def _interval_min(cls, v: int) -> int:
+        if int(v) < 5:
+            raise ValueError("loader_interval_s must be at least 5 seconds")
+        return int(v)
+
+    @field_validator("loader_max_wait_s")
+    @classmethod
+    def _max_wait_min(cls, v: int) -> int:
+        if int(v) < 60:
+            raise ValueError("loader_max_wait_s must be at least 60 seconds (1 minute)")
+        return int(v)
 
 
 class FlowNotifyTestRequest(BaseModel):

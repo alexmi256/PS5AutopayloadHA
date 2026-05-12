@@ -20,12 +20,24 @@ from autoload_parser import (
 
 
 def test_wfl_defaults():
+    """``??<port>`` (port only) leaves max_wait / interval at 0 — meaning
+    'use the flow-level ~notify header config'. The engine resolves
+    those at run time, not the parser."""
     d = parse_line("??9021")
     assert isinstance(d, WaitForLoaderDirective)
     assert d.port == 9021
-    assert d.max_wait_seconds == 10800.0
-    assert d.interval_seconds == 30.0
+    assert d.max_wait_seconds == 0.0
+    assert d.interval_seconds == 0.0
     assert d.stability_count == 1
+
+
+def test_wfl_bare_form_uses_header():
+    """``??`` alone is a valid step — port comes from the header."""
+    d = parse_line("??")
+    assert isinstance(d, WaitForLoaderDirective)
+    assert d.port == 0
+    assert d.max_wait_seconds == 0.0
+    assert d.interval_seconds == 0.0
 
 
 def test_wfl_full_form():
@@ -91,12 +103,31 @@ def test_notify_third_arg_not_service_folds_into_message():
 def test_parse_notify_config_defaults():
     cfg = parse_notify_config("# no header\nfoo.elf\n")
     assert cfg == {
-        "loader_ready":   True,
-        "flow_started":   False,
-        "flow_completed": True,
-        "flow_failed":    True,
-        "service":        "",
+        "loader_ready":      True,
+        "flow_started":      False,
+        "flow_completed":    True,
+        "flow_failed":       True,
+        "service":           "",
+        "persistent":        True,
+        "loader_port":       9021,
+        "loader_interval_s": 30,
+        "loader_max_wait_s": 10800,
     }
+
+
+def test_parse_notify_config_extra_fields():
+    """The flow-level header now also carries loader-watch defaults and
+    the optional persistent toggle."""
+    content = (
+        '# ~notify loader_ready=on loader_port=9026 loader_interval_s=15 '
+        'loader_max_wait_s=7200 persistent=off service="notify.x"\n'
+    )
+    cfg = parse_notify_config(content)
+    assert cfg["loader_port"]       == 9026
+    assert cfg["loader_interval_s"] == 15
+    assert cfg["loader_max_wait_s"] == 7200
+    assert cfg["persistent"]        is False
+    assert cfg["service"]           == "notify.x"
 
 
 def test_parse_notify_config_header():
@@ -133,9 +164,15 @@ def test_set_notify_config_replaces_existing_in_place():
 
 def test_render_notify_config_round_trip():
     cfg = {
-        "loader_ready": True, "flow_started": False,
-        "flow_completed": True, "flow_failed": False,
-        "service": "notify.x",
+        "loader_ready":      True,
+        "flow_started":      False,
+        "flow_completed":    True,
+        "flow_failed":       False,
+        "service":           "notify.x",
+        "persistent":        True,
+        "loader_port":       9021,
+        "loader_interval_s": 30,
+        "loader_max_wait_s": 10800,
     }
     line = render_notify_config(cfg)
     # parsing the line back must yield the same config
@@ -174,6 +211,11 @@ def test_invalid_notify_lines_return_none():
     assert parse_line("@notify ") is None
 
 
-def test_invalid_wfl_returns_none():
-    assert parse_line("??") is None
-    assert parse_line("??abc") is None
+def test_invalid_wfl_falls_back_to_header():
+    """``??`` alone is now a valid step that defers all params to the
+    header. A non-numeric token after ``??`` is treated the same way:
+    we keep the step (so the user can still see a placeholder in the
+    builder) and let the engine resolve the port from the header."""
+    d = parse_line("??abc")
+    assert isinstance(d, WaitForLoaderDirective)
+    assert d.port == 0

@@ -486,6 +486,24 @@ body {
 
 .input-error { border-color:var(--danger) !important }
 
+/* Wait-for-loader step: marker pointer to the Flow Notifications panel */
+.step-config-pointer {
+  display:flex; flex-wrap:wrap; align-items:center;
+  gap:.4rem; margin:.35rem 0 0;
+  font-size:.8rem; color:var(--muted);
+}
+.step-config-summary  { color:var(--text) }
+.step-config-summary strong { color:var(--text); font-weight:600 }
+.step-config-link {
+  margin-left:auto;
+  color:var(--primary); text-decoration:none;
+  font-weight:600; font-size:.78rem;
+}
+.step-config-link:hover { text-decoration:underline }
+
+/* Flow Notifications panel — loader config section */
+.flow-loader-cfg { padding-top:.3rem }
+
 /* Wait-for-loader: live progress overlay (filled by flow_wait_check WS events) */
 .step-wait-live {
   display:none;

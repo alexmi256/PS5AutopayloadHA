@@ -59,9 +59,11 @@ class WaitForLoaderDirective:
       * timeout makes the whole flow FAIL and fires a failure notification
       * success fires the loader-ready notification
     """
-    port: int = 9021
-    max_wait_seconds: float = 10800.0
-    interval_seconds: float = 30.0
+    # 0 / 0.0 means "use the per-flow ~notify header default" — the engine
+    # falls back to loader_port / loader_interval_s / loader_max_wait_s.
+    port: int = 0
+    max_wait_seconds: float = 0.0
+    interval_seconds: float = 0.0
     stability_count: int = 1
 
 
@@ -120,23 +122,44 @@ def set_version_pin(content: str, filename: str, version: str) -> str:
 # ── Notify config header ──────────────────────────────────────────
 
 _DEFAULT_NOTIFY_CONFIG: Dict[str, Any] = {
-    "loader_ready":   True,
-    "flow_started":   False,
-    "flow_completed": True,
-    "flow_failed":    True,
-    "service":        "",          # empty = persistent_notification only
+    # Event toggles
+    "loader_ready":      True,
+    "flow_started":      False,
+    "flow_completed":    True,
+    "flow_failed":       True,
+    # Delivery
+    "service":           "",          # notify.<service>; empty = persistent only
+    "persistent":        True,        # send HA persistent_notification.create
+    # Loader-watch config (used by wait_for_loader steps that don't carry
+    # their own params and as the source of truth for the UI panel)
+    "loader_port":       9021,
+    "loader_interval_s": 30,
+    "loader_max_wait_s": 10800,       # 3 h
 }
+
+_BOOL_KEYS = (
+    "loader_ready", "flow_started", "flow_completed", "flow_failed", "persistent",
+)
+_INT_KEYS  = ("loader_port", "loader_interval_s", "loader_max_wait_s")
 
 
 def _coerce_bool(val: str) -> bool:
     return val.strip().lower() in ("1", "true", "on", "yes", "y")
 
 
+def _coerce_int(val: str, fallback: int) -> int:
+    try:
+        return int(float(val))
+    except (TypeError, ValueError):
+        return fallback
+
+
 def parse_notify_config(content: str) -> Dict[str, Any]:
     """Read the first ``# ~notify k=v k=v …`` header in *content*.
 
     Missing keys fall back to :data:`_DEFAULT_NOTIFY_CONFIG`. Unknown keys
-    are ignored. Returns a fresh dict (safe to mutate)."""
+    are ignored. Returns a fresh dict (safe to mutate).
+    """
     cfg = dict(_DEFAULT_NOTIFY_CONFIG)
     for line in content.splitlines():
         m = _NOTIFY_HDR_RE.match(line.strip())
@@ -154,17 +177,33 @@ def parse_notify_config(content: str) -> Dict[str, Any]:
             v = v.strip().strip('"').strip("'")
             if k == "service":
                 cfg["service"] = v
-            elif k in cfg:
+            elif k in _BOOL_KEYS:
                 cfg[k] = _coerce_bool(v)
+            elif k in _INT_KEYS:
+                cfg[k] = _coerce_int(v, cfg[k])
         break  # only the first header counts
     return cfg
 
 
 def render_notify_config(cfg: Dict[str, Any]) -> str:
-    """Render a notify config dict as a single ``# ~notify …`` line."""
+    """Render a notify config dict as a single ``# ~notify …`` line.
+
+    Only emits non-default values so flows without notification config
+    stay tidy. Service is always quoted to survive shell-style parsing.
+    """
     parts = []
     for key in ("loader_ready", "flow_started", "flow_completed", "flow_failed"):
         parts.append(f"{key}={'on' if cfg.get(key) else 'off'}")
+    # Loader config emitted only when notifications are enabled OR values differ from defaults
+    for key, default in (("loader_port", 9021),
+                         ("loader_interval_s", 30),
+                         ("loader_max_wait_s", 10800)):
+        v = int(cfg.get(key, default) or default)
+        if v != default:
+            parts.append(f"{key}={v}")
+    # Explicit persistent toggle written only when off (default is on)
+    if cfg.get("persistent") is False:
+        parts.append("persistent=off")
     svc = (cfg.get("service") or "").strip()
     if svc:
         parts.append(f'service="{svc}"')
@@ -206,16 +245,18 @@ def parse_line(line: str) -> Optional[Directive]:
 
     # ?? must be checked BEFORE ? so the long form wins.
     if line.startswith('??'):
+        # All params are optional now — they're stored at the flow level
+        # in the ~notify header. port=0 / max=0 / interval=0 signal
+        # "use the header config" to the exec engine. Legacy flows that
+        # still ship `??9021 7200 30 1` keep working unchanged.
         rest = line[2:].strip().split()
-        if not rest:
-            return None
-        try:
-            port = int(rest[0])
-        except ValueError:
-            return None
-        max_wait = 10800.0
-        interval = 30.0
+        port = 0
+        max_wait = 0.0
+        interval = 0.0
         stability = 1
+        if rest:
+            try: port = int(rest[0])
+            except ValueError: pass
         if len(rest) >= 2:
             try: max_wait = float(rest[1])
             except ValueError: pass

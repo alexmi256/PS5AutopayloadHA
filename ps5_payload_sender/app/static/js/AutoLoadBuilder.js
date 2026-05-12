@@ -618,50 +618,31 @@ function _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns) {
   mainRow.appendChild(btns);
   stepEl.appendChild(mainRow);
 
-  function makeField(labelText, value, min, max, unit, onChange) {
-    const field = document.createElement('div');
-    field.className = 'step-field';
-    const lbl = document.createElement('span');
-    lbl.className = 'step-field-label'; lbl.textContent = labelText;
-    const inp = document.createElement('input');
-    inp.type = 'number'; inp.className = 'step-input';
-    inp.value = value; inp.min = String(min);
-    if (max) inp.max = String(max);
-    inp.addEventListener('input', e => onChange(parseFloat(e.target.value)));
-    const u = document.createElement('span');
-    u.className = 'step-unit'; u.textContent = unit;
-    field.appendChild(lbl); field.appendChild(inp); field.appendChild(u);
-    return field;
-  }
-
-  // Port (always)
-  const portRow = document.createElement('div');
-  portRow.className = 'step-content-row';
-  portRow.appendChild(makeField('Port', step.port, 1, 65535, '', v => {
-    if (v > 0 && v <= 65535) { builder.steps[idx].port = v; scheduleSave(); }
-  }));
-  stepEl.appendChild(portRow);
-
-  // Advanced: max wait + interval + stability
-  const adv = document.createElement('div');
-  adv.className = 'step-details advanced-only';
-  adv.appendChild(makeField('Max wait', Math.round((step.max_wait_s || 10800) / 60), 1, null, 'min', v => {
-    if (v > 0) { builder.steps[idx].max_wait_s = v * 60; scheduleSave(); }
-  }));
-  adv.appendChild(makeField('Interval', step.interval_s || 30, 1, null, 's', v => {
-    if (v >= 1) { builder.steps[idx].interval_s = v; scheduleSave(); }
-  }));
-  adv.appendChild(makeField('Stability', step.stability_count || 1, 1, 10, '', v => {
-    if (v >= 1) { builder.steps[idx].stability_count = v; scheduleSave(); }
-  }));
-  stepEl.appendChild(adv);
+  // The step is now a marker — its config (port / interval / timeout) lives
+  // in the Flow Notifications panel at the top of the builder card. Show a
+  // tiny pointer line so the user knows where to look.
+  const hint = document.createElement('div');
+  hint.className = 'step-config-pointer';
+  // Read live from the flow notify config so the hint stays accurate.
+  const cfg = (typeof flowNotifyReadConfig === 'function')
+    ? flowNotifyReadConfig() : {};
+  const port = (step.port || cfg.loader_port || 9021);
+  const maxMin = Math.round(((step.max_wait_seconds || step.max_wait_s
+                              || cfg.loader_max_wait_s || 10800)) / 60);
+  hint.innerHTML =
+    `<span class="step-config-summary">`
+    + `Port <strong>${port}</strong> · `
+    + `Timeout after <strong>${maxMin}</strong> min`
+    + `</span>`
+    + ` <a href="#flow-notify-card" class="step-config-link">Edit in Flow Notifications ↑</a>`;
+  stepEl.appendChild(hint);
 
   // Live progress overlay — populated by flow_wait_check WS events while the
   // flow is paused on this step. Empty when idle so it takes no vertical
   // space; gets the .active class once we start receiving polls.
   const live = document.createElement('div');
   live.className = 'step-wait-live';
-  live.dataset.port = String(step.port);   // used by handler to match poll msgs
+  live.dataset.port = String(port);   // used by handler to match poll msgs
   stepEl.appendChild(live);
 }
 
@@ -722,6 +703,10 @@ function _buildNotifyStep(step, idx, stepEl, mainRow, btns) {
 function builderRenderList() {
   const container = document.getElementById('builder-steps');
   container.innerHTML = '';
+  // After every render, refresh the "loader notification requires a ??
+  // step" warning in the Flow Notifications panel — adding or deleting
+  // a wait_for_loader step changes whether the warning should show.
+  if (typeof flowNotifyRefreshWarn === 'function') flowNotifyRefreshWarn();
   if (!builder.steps.length) {
     container.innerHTML = '<div class="empty-state">Add your first payload to start.</div>';
     return;
@@ -757,7 +742,9 @@ function builderLoadP2JBPreset() {
     'This replaces the current builder content with the P2JB template. Continue?'
   )) return;
   builder.steps = [
-    { type: 'wait_for_loader', port: 9021, max_wait_s: 10800, interval_s: 30, stability_count: 1 },
+    // No per-step params — port/interval/timeout live in the Flow
+    // Notifications panel and are written into the ~notify header.
+    { type: 'wait_for_loader', port: 0, max_wait_s: 0, interval_s: 0, stability_count: 1 },
     { type: 'notify',  title: 'Loader ready',    message: '', service_override: '' },
     { type: 'payload', filename: 'kstuff.elf', autoPort: 9021, portOverride: null, version: null },
     { type: 'delay',   ms: 1000 },
@@ -767,11 +754,15 @@ function builderLoadP2JBPreset() {
   // Set sensible notify defaults for a P2JB flow if the helper exists.
   if (typeof flowNotifyApplyConfig === 'function') {
     flowNotifyApplyConfig({
-      loader_ready:   true,
-      flow_started:   false,
-      flow_completed: true,
-      flow_failed:    true,
-      service:        '',
+      loader_ready:      true,
+      flow_started:      false,
+      flow_completed:    true,
+      flow_failed:       true,
+      service:           '',
+      persistent:        true,
+      loader_port:       9021,
+      loader_interval_s: 30,
+      loader_max_wait_s: 10800,
     });
   }
   // Suggest a name if none yet
@@ -814,10 +805,16 @@ function builderGenerate() {
       return step.portOverride ? `${step.filename} ${step.portOverride}` : step.filename;
     if (step.type === 'delay') return `!${step.ms}`;
     if (step.type === 'wait_for_loader') {
-      const max = Math.max(step.interval_s || 30, step.max_wait_s || 10800);
-      const iv  = Math.max(1, step.interval_s || 30);
-      const sc  = Math.max(1, step.stability_count || 1);
-      return `??${step.port} ${max} ${iv} ${sc}`;
+      // New canonical form: bare `??` — the engine resolves port,
+      // interval and max-wait from the flow's ~notify header. Legacy
+      // step-level overrides only get emitted if a saved flow still
+      // carries them (parser fills them, builder preserves them).
+      const parts = ['??'];
+      if (step.port)            parts.push(String(step.port));
+      if (step.max_wait_s)      parts.push(String(Math.round(step.max_wait_s)));
+      if (step.interval_s)      parts.push(String(Math.round(step.interval_s)));
+      if ((step.stability_count || 1) > 1) parts.push(String(step.stability_count));
+      return parts.join(' ').trim() || '??';
     }
     if (step.type === 'notify') {
       const t   = (step.title   || '').replace(/"/g, '\\"');
