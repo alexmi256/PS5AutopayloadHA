@@ -33,62 +33,53 @@ def client(tmp_path, monkeypatch):
 
 def test_legacy_wait_for_loader_step_migrates_to_header(client):
     """Old saved flow: ``??9021 7200 30 1`` with no notify header.
-    After parse, the step is a clean marker and the values appear in
-    the notify_config response."""
+    After parse, the step is **gone** from the response, the values
+    appear in notify_config, and ``wait_for_loader_enabled`` is on."""
     c, profiles = client
     (profiles / "legacy.txt").write_text(
         "kstuff.elf\n"
         "??9021 7200 30 1\n",
         encoding="utf-8",
     )
+    data = c.get("/api/autoload/parse/legacy.txt").json()
 
-    r = c.get("/api/autoload/parse/legacy.txt")
-    assert r.status_code == 200, r.text
-    data = r.json()
+    # No wait_for_loader step in the returned step list.
+    assert not any(s["type"] == "wait_for_loader" for s in data["steps"])
 
-    # The step is now a clean marker: zeros across the board.
-    wfl = next(s for s in data["steps"] if s["type"] == "wait_for_loader")
-    assert wfl["port"]       == 0
-    assert wfl["max_wait_s"] == 0
-    assert wfl["interval_s"] == 0
-    assert wfl["stability_count"] == 1
-
-    # And the values moved into the header.
     cfg = data["notify_config"]
+    assert cfg["wait_for_loader_enabled"] is True
     assert cfg["loader_port"]       == 9021
     assert cfg["loader_max_wait_s"] == 7200
     assert cfg["loader_interval_s"] == 30
-    # Loader-ready toggle is force-enabled when we promoted values —
-    # without it the migration would be silent.
+    # Loader-ready toggle is force-enabled — otherwise the migrated
+    # flow would silently wait without notifying.
     assert cfg["loader_ready"] is True
 
 
 def test_modern_flow_passes_through_unchanged(client):
-    """New-style ``??`` (no params) + populated header: values come
-    only from the header, the step stays a marker."""
+    """New-style flow has the toggle set in the header and NO ``??``
+    step. Parser returns the toggle and no wait_for_loader step."""
     c, profiles = client
     (profiles / "modern.txt").write_text(
-        '# ~notify loader_ready=on loader_port=9026 '
-        'loader_interval_s=60 loader_max_wait_s=3600\n'
-        '??\n'
+        '# ~notify loader_ready=on wait_for_loader_enabled=on '
+        'loader_port=9026 loader_interval_s=60 loader_max_wait_s=3600\n'
         'kstuff.elf\n',
         encoding="utf-8",
     )
-
     data = c.get("/api/autoload/parse/modern.txt").json()
-    wfl = next(s for s in data["steps"] if s["type"] == "wait_for_loader")
-    assert (wfl["port"], wfl["max_wait_s"], wfl["interval_s"]) == (0, 0, 0)
+    assert not any(s["type"] == "wait_for_loader" for s in data["steps"])
     cfg = data["notify_config"]
+    assert cfg["wait_for_loader_enabled"] is True
     assert cfg["loader_port"]       == 9026
     assert cfg["loader_interval_s"] == 60
     assert cfg["loader_max_wait_s"] == 3600
 
 
 def test_step_overrides_lose_to_explicit_header(client):
-    """If a flow already has a non-default header AND legacy step
-    overrides, the header wins — we don't clobber the user's explicit
-    config. The step keeps its values so the engine still picks them
-    up at run time (back-compat)."""
+    """If the flow header has an explicit non-default port AND the
+    legacy step has its own port, the header wins (don't clobber the
+    user's explicit config). Interval / max_wait still get promoted
+    from the step because the header was at defaults for those keys."""
     c, profiles = client
     (profiles / "mixed.txt").write_text(
         '# ~notify loader_port=9026\n'
@@ -97,15 +88,12 @@ def test_step_overrides_lose_to_explicit_header(client):
     )
     data = c.get("/api/autoload/parse/mixed.txt").json()
     cfg = data["notify_config"]
-    # Header had loader_port=9026 explicitly — that wins.
-    assert cfg["loader_port"] == 9026
-    # Step's interval/max were defaults in the header, so they get promoted.
-    assert cfg["loader_max_wait_s"] == 7200
+    assert cfg["wait_for_loader_enabled"] is True
+    assert cfg["loader_port"]       == 9026     # header wins
+    assert cfg["loader_max_wait_s"] == 7200     # promoted from step
     assert cfg["loader_interval_s"] == 30
-    # But the port stays on the step so the engine still respects 9021
-    # if (somehow) the user runs the unmigrated file directly.
-    wfl = next(s for s in data["steps"] if s["type"] == "wait_for_loader")
-    assert wfl["port"] == 9021
+    # Step is dropped from the response either way.
+    assert not any(s["type"] == "wait_for_loader" for s in data["steps"])
 
 
 def test_remote_lua_loader_port_is_first_class(client):
@@ -117,6 +105,7 @@ def test_remote_lua_loader_port_is_first_class(client):
     )
     data = c.get("/api/autoload/parse/lua.txt").json()
     cfg = data["notify_config"]
+    assert cfg["wait_for_loader_enabled"] is True
     assert cfg["loader_port"]       == 9026
     assert cfg["loader_max_wait_s"] == 1800
     assert cfg["loader_interval_s"] == 15

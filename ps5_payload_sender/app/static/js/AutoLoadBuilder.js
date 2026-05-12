@@ -180,32 +180,16 @@ function builderUpdatePayloadDropdown() {
 // ── Panels ───────────────────────────────────────────────────────
 function builderTogglePanel(type) {
   const panels = {
-    payload:     'panel-payload',
-    delay:       'panel-delay',
-    wait:        'panel-wait',
-    wait_loader: 'panel-wait-loader',
-    notify:      'panel-notify',
+    payload: 'panel-payload',
+    delay:   'panel-delay',
+    wait:    'panel-wait',
+    notify:  'panel-notify',
   };
   Object.entries(panels).forEach(([t, id]) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.style.display = (t === type && el.style.display === 'none') ? '' : 'none';
   });
-}
-
-function builderAddWaitForLoaderStep() {
-  // Pure marker — port/interval/timeout live in the Flow Notifications
-  // panel and are written to the ~notify header on save. Values stay at
-  // 0 / 0 / 0 so the engine knows to pull defaults from the header.
-  builder.steps.push({
-    type: 'wait_for_loader',
-    port: 0, max_wait_s: 0, interval_s: 0, stability_count: 1,
-  });
-  document.getElementById('panel-wait-loader').style.display = 'none';
-  builderRenderList(); scheduleSave();
-  // Nudge the user to confirm their loader settings if loader_ready was
-  // somehow turned off — opening the details makes the panel visible.
-  if (typeof flowNotifyRefreshWarn === 'function') flowNotifyRefreshWarn();
 }
 
 function builderAddNotifyStep() {
@@ -736,52 +720,6 @@ function builderRenderList() {
   if (typeof updateBuilderSummary === 'function') updateBuilderSummary();
 }
 
-// ── Preset: P2JB / Patience flow ─────────────────────────────────
-// Drops a complete, opinionated template into the builder so the
-// user can see what a typical P2JB flow looks like and tweak it.
-// The placeholder filenames may not exist in their payload library —
-// the user replaces them with whatever kstuff / sm+ build they have.
-function builderLoadP2JBPreset() {
-  if (builder.steps.length && !confirm(
-    'This replaces the current builder content with the P2JB template. Continue?'
-  )) return;
-  builder.steps = [
-    // No per-step params — port/interval/timeout live in the Flow
-    // Notifications panel and are written into the ~notify header.
-    { type: 'wait_for_loader', port: 0, max_wait_s: 0, interval_s: 0, stability_count: 1 },
-    { type: 'notify',  title: 'Loader ready',    message: '', service_override: '' },
-    { type: 'payload', filename: 'kstuff.elf', autoPort: 9021, portOverride: null, version: null },
-    { type: 'delay',   ms: 1000 },
-    { type: 'payload', filename: 'shadowmountplus.elf', autoPort: 9021, portOverride: null, version: null },
-    { type: 'notify',  title: 'Flow completed', message: '', service_override: '' },
-  ];
-  // Set sensible notify defaults for a P2JB flow if the helper exists.
-  if (typeof flowNotifyApplyConfig === 'function') {
-    flowNotifyApplyConfig({
-      loader_ready:      true,
-      flow_started:      false,
-      flow_completed:    true,
-      flow_failed:       true,
-      service:           '',
-      persistent:        true,
-      loader_port:       9021,
-      loader_interval_s: 30,
-      loader_max_wait_s: 10800,
-    });
-  }
-  // Suggest a name if none yet
-  const nameEl = document.getElementById('builder-profile-name');
-  if (nameEl && !nameEl.value.trim()) nameEl.value = 'P2JB Autoload';
-
-  builderRenderList();
-  scheduleSave();
-  if (typeof log === 'function') {
-    log('P2JB template loaded — replace kstuff.elf / shadowmountplus.elf with the payloads you have.', 'info');
-  }
-  // Scroll to the steps so the user sees what was created
-  document.getElementById('builder-steps')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 function builderMoveStep(idx, dir) {
   const newIdx = idx + dir;
   if (newIdx < 0 || newIdx >= builder.steps.length) return;
@@ -804,22 +742,12 @@ function builderGenerate() {
       pinned.add(step.filename);
     }
   });
-  const directives = builder.steps.map(step => {
+  const directives = builder.steps
+    .filter(step => step.type !== 'wait_for_loader')   // deprecated; toggle drives this now
+    .map(step => {
     if (step.type === 'payload')
       return step.portOverride ? `${step.filename} ${step.portOverride}` : step.filename;
     if (step.type === 'delay') return `!${step.ms}`;
-    if (step.type === 'wait_for_loader') {
-      // New canonical form: bare `??` — the engine resolves port,
-      // interval and max-wait from the flow's ~notify header. Legacy
-      // step-level overrides only get emitted if a saved flow still
-      // carries them (parser fills them, builder preserves them).
-      const parts = ['??'];
-      if (step.port)            parts.push(String(step.port));
-      if (step.max_wait_s)      parts.push(String(Math.round(step.max_wait_s)));
-      if (step.interval_s)      parts.push(String(Math.round(step.interval_s)));
-      if ((step.stability_count || 1) > 1) parts.push(String(step.stability_count));
-      return parts.join(' ').trim() || '??';
-    }
     if (step.type === 'notify') {
       const t   = (step.title   || '').replace(/"/g, '\\"');
       const msg = (step.message || '').replace(/"/g, '\\"');

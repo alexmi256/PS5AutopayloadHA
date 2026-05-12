@@ -96,6 +96,69 @@ def request_resume() -> bool:
     return True
 
 
+# ── Loader-poll helper ────────────────────────────────────────────
+
+async def _poll_until_loader(
+    *,
+    host: str,
+    port: int,
+    max_wait_seconds: float,
+    interval_seconds: float,
+    stability_count: int = 1,
+) -> dict:
+    """Poll *host:port* every *interval_seconds* up to *max_wait_seconds*.
+
+    Honors the module-level stop/pause events. Broadcasts a
+    ``flow_wait_check`` WS event every poll so the UI can show a live
+    progress overlay. Returns a dict:
+
+      {"reached": bool, "stopped": bool, "elapsed": float, "polls": int}
+    """
+    connect_timeout = max(1.0, min(5.0, interval_seconds / 2))
+    loop_start = asyncio.get_running_loop().time()
+    consecutive_ok = 0
+    poll = 0
+    reached = False
+    stopped = False
+    while True:
+        if _stop_event.is_set():
+            stopped = True
+            break
+        await _pause_event.wait()
+        poll += 1
+        ok = await check_port(host, port, timeout=connect_timeout)
+        consecutive_ok = consecutive_ok + 1 if ok else 0
+        elapsed = asyncio.get_running_loop().time() - loop_start
+        _log.debug(
+            "loader poll #%d port=%s ok=%s consecutive=%s elapsed=%.0fs",
+            poll, port, ok, consecutive_ok, elapsed,
+        )
+        await manager.broadcast({
+            "type": "flow_wait_check",
+            "port": port, "poll": poll,
+            "ok": ok, "consecutive": consecutive_ok,
+            "elapsed_s": round(elapsed, 1),
+            "max_wait_s": max_wait_seconds,
+        })
+        if consecutive_ok >= max(1, stability_count):
+            reached = True
+            break
+        if elapsed >= max_wait_seconds:
+            break
+        sleep_end = asyncio.get_running_loop().time() + interval_seconds
+        while asyncio.get_running_loop().time() < sleep_end:
+            if _stop_event.is_set():
+                stopped = True
+                break
+            await _pause_event.wait()
+            await asyncio.sleep(0.2)
+        if stopped:
+            break
+    final_elapsed = asyncio.get_running_loop().time() - loop_start
+    return {"reached": reached, "stopped": stopped,
+            "elapsed": final_elapsed, "polls": poll}
+
+
 # ── Runner ────────────────────────────────────────────────────────
 
 def _fmt_duration(seconds: float) -> str:
@@ -150,12 +213,76 @@ async def run_autoload(req: AutoloadRequest) -> dict:
 
         results, aborted, stopped = [], False, False
 
+        # ── Phase 1: flow-level loader wait (replaces the WAIT FOR LOADER
+        # step). Only runs when the flow's ~notify header sets
+        # `wait_for_loader_enabled=on`. Times out → flow fails immediately,
+        # no payload step runs. Loader reachable → continue to the step
+        # loop below.
+        if notify_cfg.get("wait_for_loader_enabled"):
+            eff_port     = int(notify_cfg.get("loader_port") or 9021)
+            eff_max_wait = float(notify_cfg.get("loader_max_wait_s") or 10800)
+            eff_interval = float(notify_cfg.get("loader_interval_s") or 30)
+            loader_port  = eff_port
+            await manager.status(
+                f"Waiting for loader on port {eff_port} "
+                f"(max {_fmt_duration(eff_max_wait)}, every {eff_interval:.0f}s) …",
+                waiting_port=eff_port,
+            )
+            _log.info(
+                "Flow-level loader wait started: port=%s max_wait=%ss interval=%ss host=%s",
+                eff_port, eff_max_wait, eff_interval, req.host,
+            )
+            poll_result = await _poll_until_loader(
+                host=req.host, port=eff_port,
+                max_wait_seconds=eff_max_wait, interval_seconds=eff_interval,
+            )
+            if poll_result["stopped"]:
+                stopped = True
+                await manager.status("■ Stopped", level="warn")
+            elif poll_result["reached"]:
+                loader_wait_seconds = poll_result["elapsed"]
+                _log.info("Loader reachable on port %s after %.1fs",
+                          eff_port, poll_result["elapsed"])
+                await manager.status(
+                    f"Loader on port {eff_port} reachable after "
+                    f"{_fmt_duration(poll_result['elapsed'])} ✓",
+                    level="success",
+                )
+                try:
+                    await notifications.fire_if_enabled(
+                        "loader_ready", notify_cfg,
+                        message=(
+                            f"Host: {req.host}\nPort: {eff_port}\n"
+                            f"Waited: {_fmt_duration(poll_result['elapsed'])}"
+                        ),
+                    )
+                except Exception as exc:
+                    _log.warning("loader_ready notification failed: %s", exc)
+            else:
+                # Timeout — flow fails before any payload step runs.
+                loader_timeout = True
+                loader_wait_seconds = poll_result["elapsed"]
+                waited_min = round(eff_max_wait / 60)
+                loader_timeout_msg = (
+                    f"PS5 loader was not detected within {waited_min} minutes "
+                    f"on port {eff_port}"
+                )
+                _log.error("Flow-level loader wait timeout: %s", loader_timeout_msg)
+                await manager.status(loader_timeout_msg, level="error")
+                results.append({
+                    "success": False, "message": loader_timeout_msg, "bytes_sent": 0,
+                })
+                aborted = True
+
         async def _check_stop_pause() -> bool:
             """Wait while paused; return True if stop was requested."""
             await _pause_event.wait()
             return _stop_event.is_set()
 
-        for i, d in enumerate(directives, 1):
+        # Skip the step loop entirely if the flow-level loader wait
+        # already stopped or timed out — there's no point sending payloads.
+        steps_iter = [] if (stopped or loader_timeout) else list(enumerate(directives, 1))
+        for i, d in steps_iter:
             if await _check_stop_pause():
                 stopped = True
                 await manager.status("■ Stopped", level="warn")
@@ -229,9 +356,10 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                         break
 
             elif isinstance(d, WaitForLoaderDirective):
-                # Resolve config: directive values take precedence (back-compat
-                # with legacy `??9021 7200 30 1` flows), header defaults
-                # otherwise (new-style flows save `??` alone).
+                # Legacy directive — kept so old saved flows that still
+                # carry `??` lines keep working. New flows use the
+                # flow-level wait_for_loader_enabled toggle (Phase 1 above)
+                # and emit no `??` directive at all.
                 eff_port      = d.port or int(notify_cfg.get("loader_port") or 9021)
                 eff_max_wait  = d.max_wait_seconds or float(notify_cfg.get("loader_max_wait_s") or 10800)
                 eff_interval  = d.interval_seconds or float(notify_cfg.get("loader_interval_s") or 30)
@@ -248,69 +376,38 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                     "WAIT FOR LOADER started: port=%s max_wait=%ss interval=%ss stability=%s host=%s",
                     eff_port, eff_max_wait, eff_interval, eff_stability, req.host,
                 )
-                connect_timeout = max(1.0, min(5.0, eff_interval / 2))
-                loop_start = asyncio.get_running_loop().time()
-                consecutive_ok = 0
-                reached = False
-                poll = 0
-                while True:
-                    if _stop_event.is_set():
-                        stopped = True
-                        break
-                    await _pause_event.wait()
-                    poll += 1
-                    ok = await check_port(req.host, eff_port, timeout=connect_timeout)
-                    consecutive_ok = consecutive_ok + 1 if ok else 0
-                    elapsed = asyncio.get_running_loop().time() - loop_start
-                    _log.debug(
-                        "WAIT FOR LOADER poll #%d port=%s ok=%s consecutive=%s elapsed=%.0fs",
-                        poll, eff_port, ok, consecutive_ok, elapsed,
-                    )
-                    await manager.broadcast({
-                        "type": "flow_wait_check",
-                        "port": eff_port, "poll": poll,
-                        "ok": ok, "consecutive": consecutive_ok,
-                        "elapsed_s": round(elapsed, 1),
-                        "max_wait_s": eff_max_wait,
-                    })
-                    if consecutive_ok >= eff_stability:
-                        reached = True
-                        loader_wait_seconds = elapsed
-                        _log.info(
-                            "WAIT FOR LOADER detected: port=%s after %.1fs (%d consecutive)",
-                            eff_port, elapsed, consecutive_ok,
-                        )
-                        await manager.status(
-                            f"Loader on port {eff_port} reachable after "
-                            f"{_fmt_duration(elapsed)} ✓",
-                            level="success",
-                        )
-                        break
-                    if elapsed >= eff_max_wait:
-                        break
-                    sleep_end = asyncio.get_running_loop().time() + eff_interval
-                    while asyncio.get_running_loop().time() < sleep_end:
-                        if _stop_event.is_set():
-                            break
-                        await _pause_event.wait()
-                        await asyncio.sleep(0.2)
-
-                if stopped:
+                poll_result = await _poll_until_loader(
+                    host=req.host, port=eff_port,
+                    max_wait_seconds=eff_max_wait, interval_seconds=eff_interval,
+                    stability_count=eff_stability,
+                )
+                if poll_result["stopped"]:
+                    stopped = True
                     break
-                if reached:
+                if poll_result["reached"]:
+                    loader_wait_seconds = poll_result["elapsed"]
+                    _log.info(
+                        "WAIT FOR LOADER detected: port=%s after %.1fs",
+                        eff_port, poll_result["elapsed"],
+                    )
+                    await manager.status(
+                        f"Loader on port {eff_port} reachable after "
+                        f"{_fmt_duration(poll_result['elapsed'])} ✓",
+                        level="success",
+                    )
                     try:
                         await notifications.fire_if_enabled(
                             "loader_ready", notify_cfg,
                             message=(
                                 f"Host: {req.host}\nPort: {eff_port}\n"
-                                f"Waited: {_fmt_duration(loader_wait_seconds or 0)}"
+                                f"Waited: {_fmt_duration(poll_result['elapsed'])}"
                             ),
                         )
                     except Exception as exc:
                         _log.warning("loader_ready notification failed: %s", exc)
                 else:
                     loader_timeout = True
-                    loader_wait_seconds = asyncio.get_running_loop().time() - loop_start
+                    loader_wait_seconds = poll_result["elapsed"]
                     waited_min = round(eff_max_wait / 60)
                     loader_timeout_msg = (
                         f"PS5 loader was not detected within {waited_min} minutes "

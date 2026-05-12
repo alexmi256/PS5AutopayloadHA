@@ -239,17 +239,31 @@
         <details class="flow-notify-block" id="flow-notify-card">
           <summary>Flow Notifications</summary>
           <div class="flow-notify-body">
+
+            <!-- Master toggle — replaces the WAIT FOR LOADER step entirely.
+                 When on, the flow waits for the configured loader port before
+                 running any payload step and the loader-related fields below
+                 become visible. -->
+            <label class="checkbox-label flow-loader-master">
+              <input type="checkbox" id="flow-wait-for-loader" />
+              <span><strong>Wait for loader / port before continuing</strong></span>
+            </label>
+            <p class="qs-subtitle" style="margin:.05rem 0 .4rem 1.7rem">
+              Use for long-running exploits like P2JB / Patience. The flow polls
+              the configured port and only continues once it answers.
+            </p>
+
             <div class="field-label">Notify when</div>
             <div class="p2jb-notif-grid">
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-ready"     checked /> Loader / port ready</label>
+              <label class="checkbox-label flow-loader-only"><input type="checkbox" id="flow-notify-ready" checked /> Loader / port ready</label>
               <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Flow completed</label>
-              <label class="checkbox-label"><input type="checkbox" id="flow-notify-failed"    checked /> Timeout / failure</label>
+              <label class="checkbox-label flow-loader-only"><input type="checkbox" id="flow-notify-failed" checked /> Timeout / failure</label>
               <label class="checkbox-label advanced-only"><input type="checkbox" id="flow-notify-started" /> Flow started (advanced)</label>
             </div>
 
-            <!-- Loader-watch config — only relevant when loader_ready is enabled -->
-            <div id="flow-loader-config" class="flow-loader-cfg">
-              <div class="field-label" style="margin-top:.6rem">Loader watch (used by the WAIT FOR LOADER step)</div>
+            <!-- Loader-watch config — visible only when the master toggle is on -->
+            <div id="flow-loader-config" class="flow-loader-cfg flow-loader-only">
+              <div class="field-label" style="margin-top:.6rem">Loader watch</div>
               <div class="p2jb-grid">
                 <div class="field-group">
                   <label class="field-label" for="flow-loader-port">Port to watch</label>
@@ -270,9 +284,6 @@
                   <small class="field-hint">Flow fails after this</small>
                 </div>
               </div>
-              <p id="flow-loader-warn" class="p2jb-test-warn" style="display:none">
-                ⚠ Loader notification requires a <strong>WAIT FOR LOADER</strong> step in the flow.
-              </p>
             </div>
 
             <div class="field-group" style="margin-top:.5rem">
@@ -327,19 +338,10 @@
         </details>
 
 
-        <div class="builder-presets">
-          <button id="btn-preset-p2jb" class="btn btn-sm btn-secondary"
-            title="Insert a ready-made template for a P2JB / Patience flow you can then tweak.">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M3 12h18"/><circle cx="12" cy="12" r="10"/></svg>
-            Create P2JB Flow
-          </button>
-        </div>
-
         <div class="builder-add-btns">
           <button id="btn-add-payload" class="btn btn-sm btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Payload</button>
           <button id="btn-add-delay"   class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Delay</button>
           <button id="btn-add-wait"    class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait Port</button>
-          <button id="btn-add-wait-loader" class="btn btn-sm" title="Pauses the flow until the PS5 ELF loader becomes reachable. Used for long-running exploits like P2JB / Patience."><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait for Loader</button>
           <button id="btn-add-notify"  class="btn btn-sm advanced-only" title="Fire a free-form notification inline. Most users don't need this — the flow already fires automatic notifications for loader-ready, completion, and timeout."><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Notify</button>
         </div>
 
@@ -395,34 +397,6 @@
           <div class="row-gap" style="margin-top:.4rem">
             <button id="btn-panel-wait-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
             <button id="btn-panel-wait-x"  class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-          </div>
-        </div>
-
-        <!-- Wait-for-loader panel — pure marker insertion (no inputs).
-             All loader config (port, interval, timeout) lives in the
-             Flow Notifications panel above. -->
-        <div id="panel-wait-loader" class="add-panel" style="display:none">
-          <p class="step-help">
-            <strong>Pauses the flow until the configured loader port becomes reachable.</strong><br>
-            Works for any loader you want to wait for — <em>ELF (default 9021)</em>,
-            <em>Remote Lua (9026)</em>, or anything else. Used for long-running
-            exploits like <em>P2JB / Patience</em>: start the exploit on the console,
-            this step blocks the flow until the loader answers, then your
-            payloads run automatically. On timeout the flow fails and a
-            failure notification fires.
-          </p>
-          <div class="step-help-typical">
-            <span class="step-help-typical-label">Typical order:</span>
-            <span class="step-help-flow">Exploit trigger → <strong>WAIT FOR LOADER</strong> → payload chain</span>
-          </div>
-          <p class="qs-subtitle" style="margin:.4rem 0 .55rem">
-            Port, check interval and timeout are configured once per flow in
-            <strong>Flow Notifications</strong> above — no inputs here.
-          </p>
-
-          <div class="row-gap" style="margin-top:.4rem">
-            <button id="btn-panel-wfl-ok" class="btn btn-primary btn-sm" style="flex:1">Add WAIT FOR LOADER step</button>
-            <button id="btn-panel-wfl-x"  class="btn btn-sm">Close</button>
           </div>
         </div>
 

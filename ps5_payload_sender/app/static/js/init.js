@@ -62,10 +62,8 @@ async function init() {
   document.getElementById('btn-panel-wait-ok').addEventListener('click', builderAddWaitStep);
   document.getElementById('btn-panel-wait-x').addEventListener('click',  () => builderTogglePanel('wait'));
 
-  document.getElementById('btn-preset-p2jb')?.addEventListener('click', builderLoadP2JBPreset);
-  document.getElementById('btn-add-wait-loader').addEventListener('click', () => builderTogglePanel('wait_loader'));
-  document.getElementById('btn-panel-wfl-ok').addEventListener('click',    builderAddWaitForLoaderStep);
-  document.getElementById('btn-panel-wfl-x').addEventListener('click',     () => builderTogglePanel('wait_loader'));
+  // (WAIT FOR LOADER step + P2JB preset removed — loader waiting is now
+  //  a flow-level option configured in Flow Notifications.)
 
   document.getElementById('btn-add-notify').addEventListener('click',      () => builderTogglePanel('notify'));
   document.getElementById('btn-panel-notify-ok').addEventListener('click', builderAddNotifyStep);
