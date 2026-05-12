@@ -102,3 +102,21 @@ class SourceUpdateRequest(BaseModel):
 class PatchFlowVersionsRequest(BaseModel):
     filename: str
     version: str
+
+
+class P2JBMonitorConfig(BaseModel):
+    """Configuration for the P2JB / Patience loader-ready monitor."""
+    host: str
+    elf_port: int = 9021
+    lua_port: Optional[int] = None             # None = don't poll LUA
+    check_interval: float = 30.0               # seconds between polls
+    max_wait: float = 10800.0                  # 3 hours
+    auto_run: bool = False                     # run a saved flow when loader ready
+    flow_name: Optional[str] = None            # saved-profile name (.txt optional)
+    # Notification toggles
+    notify_loader_ready: bool = True
+    notify_flow_started: bool = False
+    notify_flow_completed: bool = True
+    notify_flow_failed: bool = True
+    # Optional notify.<service> on top of persistent_notification
+    notify_service: Optional[str] = None

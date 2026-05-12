@@ -121,6 +121,7 @@ async function init() {
   await refreshProfiles();
   updateProfilesSummary();
   initCollapsible();
+  if (typeof initP2JBMonitor === 'function') await initP2JBMonitor();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();

@@ -80,6 +80,95 @@
       <div id="favorites-list" class="qs-list"></div>
     </section>
 
+    <!-- P2JB / PATIENCE MONITOR (collapsible) -->
+    <section class="card collapsible" id="section-p2jb">
+      <div class="collapse-header">
+        <span class="collapse-arrow" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        <h2 class="card-title">P2JB / Patience Monitor</h2>
+        <span class="collapse-summary" id="summary-p2jb"></span>
+      </div>
+      <div class="collapse-body">
+        <p class="qs-subtitle">
+          Watches the PS5 ELF loader port and reacts when the jailbreak
+          succeeds. Start P2JB / Patience on the console first — this
+          monitor never triggers the exploit itself.
+        </p>
+
+        <!-- Live status -->
+        <div class="p2jb-status-row">
+          <span id="p2jb-status-pill" class="p2jb-pill p2jb-pill-idle">
+            <span id="p2jb-status-label">Idle</span>
+          </span>
+          <span id="p2jb-status-sub" class="p2jb-status-sub"></span>
+        </div>
+
+        <!-- Form -->
+        <div class="field-group">
+          <label class="field-label" for="p2jb-host">PS5 IP</label>
+          <input id="p2jb-host" class="input" placeholder="leave blank to use main IP above" />
+        </div>
+
+        <div class="p2jb-grid">
+          <div class="field-group">
+            <label class="field-label" for="p2jb-elf-port">ELF port</label>
+            <input id="p2jb-elf-port" class="input" type="number" min="1" max="65535" value="9021" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">
+              <input type="checkbox" id="p2jb-lua-enable" /> Also check LUA
+            </label>
+            <input id="p2jb-lua-port" class="input" type="number" min="1" max="65535" value="9026" disabled />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="p2jb-interval">Check every (s)</label>
+            <input id="p2jb-interval" class="input" type="number" min="1" max="600" value="30" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="p2jb-max-wait">Max wait (min)</label>
+            <input id="p2jb-max-wait" class="input" type="number" min="1" max="1440" value="180" />
+          </div>
+        </div>
+
+        <!-- Auto-run flow -->
+        <div class="field-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="p2jb-auto-run" />
+            <span>Run flow automatically when loader is ready</span>
+          </label>
+        </div>
+        <div id="p2jb-flow-row" class="field-group" style="display:none">
+          <label class="field-label" for="p2jb-flow">Flow</label>
+          <select id="p2jb-flow" class="input select">
+            <option value="">– Select a flow –</option>
+          </select>
+        </div>
+
+        <!-- Notification config -->
+        <div class="p2jb-notif-block">
+          <div class="field-label">Notify when</div>
+          <div class="p2jb-notif-grid">
+            <label class="checkbox-label"><input type="checkbox" id="p2jb-notify-ready"     checked /> Loader ready</label>
+            <label class="checkbox-label"><input type="checkbox" id="p2jb-notify-started"          /> Flow started</label>
+            <label class="checkbox-label"><input type="checkbox" id="p2jb-notify-completed" checked /> Flow completed</label>
+            <label class="checkbox-label"><input type="checkbox" id="p2jb-notify-failed"    checked /> Flow failed / timeout</label>
+          </div>
+          <div class="field-group" style="margin-top:.45rem">
+            <label class="field-label" for="p2jb-notify-service">
+              Additional <code>notify.&lt;service&gt;</code> (optional)
+            </label>
+            <input id="p2jb-notify-service" class="input"
+              placeholder="e.g. mobile_app_iphone (leave empty for HA notification center only)" />
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="section-actions" style="margin-top:.6rem">
+          <button id="btn-p2jb-start" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg> Monitor P2JB</button>
+          <button id="btn-p2jb-stop"  class="btn btn-danger" style="display:none"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg> Stop monitor</button>
+        </div>
+      </div>
+    </section>
+
     <!-- PAYLOAD SOURCES (collapsible) -->
     <section class="card collapsible" id="section-sources">
       <div class="collapse-header">
@@ -468,6 +557,7 @@
   <script src="static/js/PayloadSources.js"></script>
   <script src="static/js/ConfigBackup.js"></script>
   <script src="static/js/PortTiming.js"></script>
+  <script src="static/js/P2JBMonitor.js"></script>
   <script src="static/js/CollapsibleSections.js"></script>
   <script src="static/js/init.js"></script>
 </body>
