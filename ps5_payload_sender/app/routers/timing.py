@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
@@ -39,7 +39,7 @@ async def api_record_timing(request: Request):
 async def api_analyze_timing(req: AnalyzePortRequest):
     """Check port, record timing, return result + stats."""
     start_ts = time.time()
-    start_iso = datetime.utcnow().isoformat() + "Z"
+    start_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
 
     async def _prog(elapsed, total):
         await manager.status(
@@ -53,7 +53,7 @@ async def api_analyze_timing(req: AnalyzePortRequest):
         connect_timeout=2.0, progress_callback=_prog,
     )
     duration_ms = int((time.time() - start_ts) * 1000)
-    ready_iso = datetime.utcnow().isoformat() + "Z"
+    ready_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
 
     if ok:
         loop = asyncio.get_running_loop()
