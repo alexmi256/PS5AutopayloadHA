@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
+from atomic_write import atomic_write_text
 from config import (
     ALLOWED_PAYLOAD_EXTENSIONS,
     CONFIG_BASE,
@@ -85,9 +86,7 @@ def load_devices() -> List[Dict[str, Any]]:
 
 
 def save_devices(devices: List[Dict[str, Any]]) -> None:
-    DEVICES_FILE.write_text(
-        json.dumps(devices, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(DEVICES_FILE, json.dumps(devices, ensure_ascii=False, indent=2))
 
 
 # ── UI state ──────────────────────────────────────────────────────
@@ -102,9 +101,7 @@ def load_ui_state() -> dict:
 
 
 def save_ui_state(data: dict) -> None:
-    STATE_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(STATE_FILE, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 # ── Directory listings ────────────────────────────────────────────
@@ -121,9 +118,7 @@ def load_sources() -> List[Dict[str, Any]]:
 
 
 def save_sources(sources: List[Dict[str, Any]]) -> None:
-    SOURCES_FILE.write_text(
-        json.dumps(sources, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(SOURCES_FILE, json.dumps(sources, ensure_ascii=False, indent=2))
 
 
 # ── Payload metadata ──────────────────────────────────────────────
@@ -138,9 +133,7 @@ def load_payload_meta() -> Dict[str, Any]:
 
 
 def save_payload_meta(meta: Dict[str, Any]) -> None:
-    PAYLOAD_META_FILE.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(PAYLOAD_META_FILE, json.dumps(meta, ensure_ascii=False, indent=2))
 
 
 # ── Directory listings ────────────────────────────────────────────
@@ -217,9 +210,7 @@ def restore_backup(data: dict) -> None:
     """Restore all configuration from a backup dict (after auto-saving current)."""
     # Auto-backup current config first
     _auto_backup = CONFIG_BASE / "pre_restore_backup.json"
-    _auto_backup.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(_auto_backup, json.dumps(build_backup(), ensure_ascii=False, indent=2))
 
     if "state" in data:
         save_ui_state(data["state"])
@@ -234,7 +225,7 @@ def restore_backup(data: dict) -> None:
         for name, content in data["profiles"].items():
             safe = Path(name).name
             if safe.endswith(".txt"):
-                (PROFILES_DIR / safe).write_text(content, encoding="utf-8")
+                atomic_write_text(PROFILES_DIR / safe, content)
 
 
 _SETTINGS_KEYS = frozenset({
@@ -261,9 +252,7 @@ def restore_backup_selective(
 
     # Auto-backup current config before touching anything
     _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.json"
-    _auto.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(_auto, json.dumps(build_backup(), ensure_ascii=False, indent=2))
 
     imported: dict = {
         "sources": 0, "payloads": 0, "flows": 0, "profiles": 0, "settings": False,
@@ -355,7 +344,7 @@ def restore_backup_selective(
             target = PROFILES_DIR / safe
             if target.exists() and mode == "merge" and conflict == "skip":
                 continue
-            target.write_text(content, encoding="utf-8")
+            atomic_write_text(target, content)
             count += 1
             # Validate: flag profiles that reference payload files not on disk
             for line in content.splitlines():
@@ -381,9 +370,7 @@ def reset_config() -> dict:
 
     # Backup first
     backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.json"
-    backup_file.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(backup_file, json.dumps(build_backup(), ensure_ascii=False, indent=2))
 
     # Wipe payload files
     deleted_payloads = 0
