@@ -62,6 +62,7 @@ async function init() {
   document.getElementById('btn-panel-wait-ok').addEventListener('click', builderAddWaitStep);
   document.getElementById('btn-panel-wait-x').addEventListener('click',  () => builderTogglePanel('wait'));
 
+  document.getElementById('btn-preset-p2jb')?.addEventListener('click', builderLoadP2JBPreset);
   document.getElementById('btn-add-wait-loader').addEventListener('click', () => builderTogglePanel('wait_loader'));
   document.getElementById('btn-panel-wfl-ok').addEventListener('click',    builderAddWaitForLoaderStep);
   document.getElementById('btn-panel-wfl-x').addEventListener('click',     () => builderTogglePanel('wait_loader'));

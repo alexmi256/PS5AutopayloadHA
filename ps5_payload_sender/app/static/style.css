@@ -485,6 +485,47 @@ body {
 .flow-notify-body { margin-top:.45rem }
 
 .input-error { border-color:var(--danger) !important }
+
+/* Wait-for-loader: live progress overlay (filled by flow_wait_check WS events) */
+.step-wait-live {
+  display:none;
+  align-items:center; gap:.4rem;
+  margin:.4rem 0 0; padding:.4rem .6rem;
+  border-radius:var(--r-sm);
+  background:var(--bg-soft); border:1px dashed var(--border);
+  font-size:.8rem;
+}
+.step-wait-live.active        { display:flex }
+.step-wait-live.reachable     { border-style:solid; border-color:var(--green);
+                                background:var(--green-soft); color:var(--green) }
+.step-wait-live.timeout       { border-style:solid; border-color:var(--danger);
+                                background:var(--danger-soft); color:var(--danger) }
+.step-wait-icon               { font-size:1rem; line-height:1 }
+.step-wait-live:not(.reachable):not(.timeout) .step-wait-icon { animation:pulse 1.6s infinite }
+.step-wait-text               { flex:1 }
+.step-wait-elapsed            { color:var(--muted); font-variant-numeric:tabular-nums }
+.step-wait-live.reachable .step-wait-elapsed { color:inherit; opacity:.85 }
+
+/* Wait-for-loader add-panel help block */
+.step-help {
+  margin:0 0 .55rem; padding:.5rem .65rem;
+  background:var(--bg-soft); border-left:3px solid var(--primary);
+  border-radius:var(--r-sm); font-size:.83rem; line-height:1.45;
+}
+.step-help-typical {
+  display:flex; gap:.45rem; align-items:center;
+  margin:.25rem 0 .35rem; padding:.4rem .55rem;
+  background:var(--card-hi); border-radius:var(--r-sm);
+  font-size:.78rem;
+}
+.step-help-typical-label { color:var(--muted); font-weight:600 }
+.step-help-flow          { color:var(--text) }
+.field-hint              { color:var(--muted); font-size:.74rem; display:block; margin-top:.2rem }
+
+/* Builder preset row (sits above the step add-buttons) */
+.builder-presets { display:flex; gap:.4rem; margin-bottom:.45rem }
+.builder-presets .btn { gap:.3rem }
+
 .step-filename {
   flex:1; font-size:.87rem; line-height:1.35; min-width:0;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;

@@ -89,11 +89,32 @@ function handleFlowNotifyEvent(msg) {
     return;
   }
   if (msg.type === 'flow_wait_check') {
-    // Lightweight progress hint via the status log every few polls.
-    if (msg.poll % 5 === 1) {
-      log(`Waiting for loader on port ${msg.port} — poll #${msg.poll} (${msg.elapsed_s}s elapsed)`, 'info');
+    _updateWaitLoaderLiveOverlay(msg);
+    // Also push a sparse hint into the main log so the user sees activity
+    // even if the builder card is scrolled off-screen.
+    if (msg.poll % 10 === 1) {
+      log(`Waiting for loader on port ${msg.port} — poll #${msg.poll} (${_fmtWaited(msg.elapsed_s)} elapsed)`, 'info');
     }
   }
+}
+
+function _updateWaitLoaderLiveOverlay(msg) {
+  // Find the wait_for_loader step whose port matches the poll's port —
+  // there's usually only one, so a name-attr lookup is enough.
+  const live = document.querySelector(
+    `.builder-step .step-wait-live[data-port="${msg.port}"]`,
+  );
+  if (!live) return;
+  const elapsedTxt = _fmtWaited(msg.elapsed_s || 0);
+  live.classList.add('active');
+  live.classList.toggle('reachable', !!msg.ok);
+  live.innerHTML = msg.ok
+    ? `<span class="step-wait-icon">✅</span>
+       <span class="step-wait-text">Loader reachable on port ${msg.port}
+         (${elapsedTxt} elapsed, ${msg.consecutive}/${msg.consecutive || 1} stable)</span>`
+    : `<span class="step-wait-icon">⏳</span>
+       <span class="step-wait-text">Checking port ${msg.port}…
+         <span class="step-wait-elapsed">${elapsedTxt} elapsed</span></span>`;
 }
 
 // ─── Test buttons ────────────────────────────────────────────────
