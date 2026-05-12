@@ -4,6 +4,13 @@
 
 ### UI Refresh
 
+- **Roboto + Lucide SVG icons** (follow-up to the visual refresh):
+  - Replaced **Inter** with **Roboto Variable** (`static/fonts/Roboto.woff2`, ~43 KB latin subset). Same font Home Assistant itself ships, so the add-on now blends into the HA shell instead of standing out with its own typeface.
+  - Replaced every emoji/unicode-glyph icon (`☀`, `⬇`, `⬆`, `↺`, `⚙`, `＋`, `↻`, `▶`, `✕`, `🗑`, `🔍`, `⚠`, `💾`, `■`, `🌙`, `📌`) with **inline Lucide SVG icons** (MIT, monochrome, stroke-based). On macOS / iOS Safari the emoji icons were rendering as full-colour Apple Emoji glyphs, which clashed with the minimal aesthetic. New rendering is consistent on every browser and inherits text colour via `currentColor`.
+  - Touched: `index.html` (24 inline SVGs in static buttons / collapse arrows), `state.js`, `ConnectionPanel.js`, `PayloadList.js`, `PayloadSources.js`, `AutoLoadBuilder.js`, `ProfileManager.js`, `FavoritesBar.js`, `PortTiming.js` (27 SVGs emitted from render code via the new `icon()` helper).
+  - The `⭐ Favorites` filter tab / option labels / toast text — where `<option>` can't host an SVG — switched from emoji `⭐` (U+2B50, colour-emoji) to text-style `★` (U+2605, monochrome) so the favourites indicator renders the same everywhere.
+  - **`.collapse-arrow` rotation flipped**: closed state now `rotate(-90deg)` (chevron points right), `.open` is `rotate(0deg)` (chevron points down). The old `▶` glyph used the inverse — chevron-down replaces it without changing the existing collapse JS.
+
 - **Visual refresh of the existing UI** — same layout, same controls, just better dressed:
   - **Self-hosted Inter (variable, ~352 KB) + JetBrains Mono Regular/Medium (~185 KB)** under `static/fonts/`. Loaded with `font-display:swap` so the system stack is used until the .woff2 lands. Total ~540 KB, paid once and cached.
   - **Design tokens overhaul**: slightly desaturated primary (`#4a6cf7` → `#5b7cfa` dark / `#4263eb` light), calmer borders, separate `--bg-soft` / `--card-hi` / `--border-hi` / `--warn-soft` / `--pri-soft` etc. for tinted surfaces. Radius dropped one notch (`.75rem` → `10px`, `.5rem` → `6px`).

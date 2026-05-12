@@ -28,7 +28,7 @@ function renderPayloads() {
       query
         ? 'No payloads found.'
         : state.payloadFilter === 'favorites'
-          ? 'No favorites yet. Click ⭐ on a payload to add it.'
+          ? 'No favorites yet. Click ★ on a payload to add it.'
           : 'No payloads. Upload a .lua or .elf file.'
     }</div>`;
     renderBulkBar();
@@ -106,13 +106,13 @@ function buildPayloadItem(p) {
 
   const favBtn = document.createElement('button');
   favBtn.className   = 'p-fav' + (isFav ? ' p-fav-active' : '');
-  favBtn.textContent = '⭐';
+  favBtn.innerHTML  = icon('star', {filled:true});
   favBtn.title       = isFav ? 'Remove from favorites' : 'Add to favorites';
   favBtn.addEventListener('click', e => { e.stopPropagation(); togglePayloadFavorite(p.name); });
 
   const sendBtn = document.createElement('button');
   sendBtn.className   = 'p-send';
-  sendBtn.textContent = '▶ Send to PS5';
+  sendBtn.innerHTML  = icon('play') + ' Send to PS5';
   sendBtn.addEventListener('click', async e => {
     e.stopPropagation();
     await sendDirect(p.name, p.auto_port, portInput, sendBtn);
@@ -120,7 +120,7 @@ function buildPayloadItem(p) {
 
   const del = document.createElement('button');
   del.className   = 'p-del';
-  del.textContent = '✕';
+  del.innerHTML  = icon('x');
   del.title       = 'Delete';
   del.addEventListener('click', async e => {
     e.stopPropagation();
@@ -210,7 +210,7 @@ function buildPayloadItem(p) {
       // New version available
       const warnEl = document.createElement('span');
       warnEl.className   = 'payload-update-warn';
-      warnEl.textContent = `⚠ ${updateInfo.latest_version}`;
+      warnEl.innerHTML  = icon('alert-triangle') + ` ${updateInfo.latest_version}`;
       warnEl.title       = 'New version available on GitHub';
       const updBtn = document.createElement('button');
       updBtn.className   = 'btn btn-sm source-update-btn';
@@ -353,7 +353,7 @@ async function sendDirect(filename, autoPort, portInput, btn) {
     log('Send: ' + e.message, 'error');
     btn.textContent = 'Failed ❌'; btn.className = 'p-send err';
   }
-  setTimeout(() => { btn.disabled = false; btn.textContent = '▶ Send to PS5'; btn.className = 'p-send'; }, 2500);
+  setTimeout(() => { btn.disabled = false; btn.innerHTML  = icon('play') + ' Send to PS5'; btn.className = 'p-send'; }, 2500);
 }
 
 async function bulkDeleteSelected() {

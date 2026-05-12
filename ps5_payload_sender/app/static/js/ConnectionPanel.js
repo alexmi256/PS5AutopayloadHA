@@ -82,7 +82,7 @@ function renderDeviceListModal() {
       closeDeviceModal(); scheduleSave();
     });
     const delBtn = document.createElement('button');
-    delBtn.className = 'btn btn-sm btn-danger'; delBtn.textContent = '✕';
+    delBtn.className = 'btn btn-sm btn-danger'; delBtn.innerHTML  = icon('x');
     delBtn.addEventListener('click', async () => {
       state.devices = state.devices.filter(x => x.id !== d.id);
       await saveDevicesToServer();

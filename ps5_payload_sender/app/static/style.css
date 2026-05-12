@@ -4,15 +4,17 @@
 
 /* ---- Self-hosted webfonts ----
    Loaded with font-display:swap so the system stack is used until the
-   variable .woff2 is ready (~350 KB Inter + ~95 KB JBM). The add-on is
-   served locally so the network cost is paid once, then cached. */
+   variable .woff2 is ready. Roboto matches the font Home Assistant
+   itself ships, so the add-on blends into the HA iframe. JetBrains Mono
+   covers all technical strings (filenames, IPs, version tags, ports).
+   Total ~225 KB, paid once and cached. */
 @font-face {
-  font-family: "Inter";
+  font-family: "Roboto";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/Inter.woff2") format("woff2-variations"),
-       url("fonts/Inter.woff2") format("woff2");
+  src: url("fonts/Roboto.woff2") format("woff2-variations"),
+       url("fonts/Roboto.woff2") format("woff2");
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -107,14 +109,30 @@
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
 html { font-size:16px }
 body {
-  font-family:"Inter","Inter var",system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  font-feature-settings:"cv02","cv11","ss01"; /* slightly more legible Inter shapes */
+  font-family:"Roboto","Roboto Flex",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   -webkit-font-smoothing:antialiased;
   background:var(--bg); color:var(--text); min-height:100vh; line-height:1.5;
 }
 
 /* Monospace utility — applied below to filenames, ports, versions, IPs. */
 .mono, code, kbd { font-family:var(--mono); font-size:.92em; }
+
+/* Lucide icons — inline SVGs emitted by static/js/icons.js or hardcoded
+   in index.html. Default size lives in the markup (width/height attrs),
+   but in inline-text contexts the baseline alignment looks off without
+   `vertical-align: text-bottom`. Inside flex containers (every .btn) the
+   flex alignment overrides this and the icon centres on the cap height. */
+.lucide {
+  display:inline-block;
+  vertical-align:-2px;
+  flex-shrink:0;
+}
+/* Icon-only buttons get a 0 gap so the SVG sits dead-centre. */
+.btn-icon-btn .lucide { vertical-align:middle }
+/* Status pills / badges use a slightly smaller icon. */
+.source-update-badge .lucide,
+.update-count-badge  .lucide,
+.payload-update-warn .lucide { width:12px; height:12px; vertical-align:-1px; }
 
 /* These classes are populated with technical strings (filenames, IPs,
    version tags, port numbers, asset paths). Forcing a mono face here
@@ -945,16 +963,21 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
 .collapse-header:hover  { background: rgba(128,128,128,.07) }
 .collapse-header:active { background: rgba(128,128,128,.13) }
 
-/* Arrow: ▶ rotated 90° = open (pointing down), 0° = closed */
+/* Chevron-down SVG: closed state rotates -90° (points right);
+   .open removes the rotation so it points down. */
 .collapse-arrow {
   font-size: .68rem;
   color: var(--dim);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  transform: rotate(-90deg);
   display: inline-block;
   transition: transform .18s ease;
   transform: rotate(0deg);
 }
-.collapse-arrow.open { transform: rotate(90deg) }
+.collapse-arrow.open { transform: rotate(0deg) }
+.collapse-arrow      { transition: transform .15s }
 
 /* Title inside header has no bottom margin */
 .collapse-header .card-title { margin-bottom: 0; flex-shrink: 0 }

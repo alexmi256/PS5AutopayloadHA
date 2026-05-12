@@ -78,10 +78,10 @@ function _setBuilderRunning(running) {
   if (!btn) return;
   if (running) {
     btn.className = 'btn btn-danger btn-xl';
-    btn.textContent = '■ Stop';
+    btn.innerHTML  = icon('square', {filled:true}) + ' Stop';
   } else {
     btn.className = 'btn btn-primary btn-xl';
-    btn.textContent = '▶ Run';
+    btn.innerHTML  = icon('play') + ' Run';
   }
 }
 
@@ -144,7 +144,7 @@ function builderUpdatePayloadDropdown() {
     items.forEach(p => {
       const opt = document.createElement('option');
       opt.value          = p.name;
-      opt.textContent    = (state.payloadFavorites.includes(p.name) ? '⭐ ' : '') + p.name;
+      opt.textContent    = (state.payloadFavorites.includes(p.name) ? '★ ' : '') + p.name;
       opt.dataset.autoPort = String(p.auto_port);
       grp.appendChild(opt);
     });
@@ -276,7 +276,7 @@ function _builderMakeOrderBtns(idx) {
   downBtn.disabled = idx === builder.steps.length - 1;
   downBtn.addEventListener('click', () => builderMoveStep(idx, 1));
   const delBtn = document.createElement('button');
-  delBtn.className   = 'btn btn-sm btn-danger'; delBtn.textContent = '✕';
+  delBtn.className   = 'btn btn-sm btn-danger'; delBtn.innerHTML  = icon('x');
   delBtn.addEventListener('click', () => builderDeleteStep(idx));
   btns.appendChild(upBtn); btns.appendChild(downBtn); btns.appendChild(delBtn);
   return btns;
@@ -302,7 +302,7 @@ function _buildPayloadEditPanel(step, idx) {
       items.forEach(p => {
         const opt = document.createElement('option');
         opt.value            = p.name;
-        opt.textContent      = (state.payloadFavorites.includes(p.name) ? '⭐ ' : '') + p.name;
+        opt.textContent      = (state.payloadFavorites.includes(p.name) ? '★ ' : '') + p.name;
         opt.dataset.autoPort = String(p.auto_port);
         if (p.name === step.filename) opt.selected = true;
         grp.appendChild(opt);
@@ -327,7 +327,7 @@ function _buildPayloadEditPanel(step, idx) {
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className   = 'btn btn-sm';
-  cancelBtn.textContent = '✕';
+  cancelBtn.innerHTML  = icon('x');
   cancelBtn.title       = 'Cancel';
   cancelBtn.addEventListener('click', () => { panel.style.display = 'none'; });
 
