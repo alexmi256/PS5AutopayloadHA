@@ -8,7 +8,6 @@ async function refreshProfiles() {
     renderProfileList();
     renderFavorites();
     if (typeof updateProfilesSummary === 'function') updateProfilesSummary();
-    if (typeof populateFlowSelector === 'function') populateFlowSelector(state.profiles);
   } catch (e) { log('Load profiles: ' + e.message, 'error'); }
 }
 
