@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### UI Refresh
+
+- **Visual refresh of the existing UI** — same layout, same controls, just better dressed:
+  - **Self-hosted Inter (variable, ~352 KB) + JetBrains Mono Regular/Medium (~185 KB)** under `static/fonts/`. Loaded with `font-display:swap` so the system stack is used until the .woff2 lands. Total ~540 KB, paid once and cached.
+  - **Design tokens overhaul**: slightly desaturated primary (`#4a6cf7` → `#5b7cfa` dark / `#4263eb` light), calmer borders, separate `--bg-soft` / `--card-hi` / `--border-hi` / `--warn-soft` / `--pri-soft` etc. for tinted surfaces. Radius dropped one notch (`.75rem` → `10px`, `.5rem` → `6px`).
+  - **Typography**: Inter for body, JetBrains Mono for every technical string (filenames, port numbers, version tags, IP addresses, asset paths, source repo slugs, search input for payloads, autoload editor textarea, status log). Forced via a CSS-only selector list so no JS render function needed touching.
+  - **Card titles** are no longer uppercase mini-labels — they're now readable 0.95 rem 600-weight headings.
+  - **Buttons** slightly slimmer (padding `.48rem .8rem`), unified hover (subtle bg + border-hi), `.btn-danger` quieter at rest (border only, soft red tint on hover instead of a solid red fill).
+  - **Filter tabs** turned into a segmented pill control (one shared track with a moving inset highlight) instead of separate outlined chips.
+  - **Quick-start tiles** softened to a `--pri-soft` pill with no border at rest; the full-primary fill only appears on hover.
+  - **Source-has-updates** rows now have a warn-tinted background (in addition to the existing 3 px amber left bar), and the badge moved from a solid amber chip to a soft amber-tinted text label.
+  - **Source update drawer**: fixed a dead `var(--panel)` reference that left the inline update rows transparent in the dev build.
+  - **`@font-face` ranges**: Inter variable covers 100–900 weight in a single file, JetBrains Mono ships at Regular + Medium.
+- **Bump dev build to 1.1.1-11-dev** so HA picks up the new static assets (cache-busted via the existing `?v=APP_VERSION` query).
+
 ### Internal
 
 - **Crash-safe writes for every persistent config file**: every `Path.write_text(...)` / `write_bytes(...)` call on user-critical files (`sources.json`, `devices.json`, `state.json`, `payload_meta.json`, `flow_runs.json`, `port_timing.json`, `pre_restore_backup.json`, the imported/exported backup JSONs, every profile `.txt` and every imported payload `.elf` / `.lua`) now goes through a small `atomic_write` helper that writes to a sibling `.tmp` file first and then `os.replace`-es it onto the target. Previously, an OOM-kill or SD-card power loss mid-write left a truncated/half-written file and the user lost their entire add-on configuration. With the atomic pattern, a reader will always see either the previous valid file or the new valid file, never a partial one. New: `app/atomic_write.py` + `tests/test_atomic_write.py`.
