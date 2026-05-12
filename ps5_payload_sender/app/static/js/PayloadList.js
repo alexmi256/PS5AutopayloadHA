@@ -261,7 +261,7 @@ function buildPayloadItem(p) {
       const hasMultiVer = (Array.isArray(p.source && p.source.versions) ? p.source.versions : []).length > 1;
       if (builderMatches.length && hasMultiVer) {
         const updBtn = document.createElement('button');
-        updBtn.className   = 'btn btn-sm';
+        updBtn.className   = 'btn btn-sm source-apply-btn';
         updBtn.textContent = 'Apply to flows';
         updBtn.title       = 'Apply the currently selected version to every flow that uses this payload';
         updBtn.addEventListener('click', async ev => {

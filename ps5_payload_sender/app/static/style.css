@@ -742,10 +742,12 @@ body:not(.advanced-mode) .advanced-only { display: none !important }
   max-width:200px; flex-shrink:1;
 }
 .source-ver { font-size:.72rem; color:var(--muted); font-family:monospace; flex-shrink:0 }
+.source-update-btn,
+.source-apply-btn {
+  margin-left:auto;
+}
 .source-update-btn {
-  margin-left:auto; font-size:.72rem; font-weight:700;
   color:var(--green); border-color:var(--green);
-  padding:.1rem .45rem;
 }
 .source-update-btn:hover { background:var(--green); color:#fff }
 
