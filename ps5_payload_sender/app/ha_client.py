@@ -223,8 +223,20 @@ def send_persistent_notification(title: str, message: str) -> bool:
 
 
 def send_notify_service(service: str, title: str, message: str) -> bool:
-    """Call notify.<service> (e.g. 'mobile_app_iphone' for push)."""
-    return _call_ha_service("notify", service, {"title": title, "message": message})
+    """Call ``notify.<service>``.
+
+    The user-facing config always carries the ``notify.`` prefix (it's
+    validated to start with it). Strip it here so the REST URL becomes
+    ``/core/api/services/notify/<service>`` rather than the broken
+    ``/core/api/services/notify/notify.<service>``.
+    """
+    svc = service.strip()
+    if svc.startswith("notify."):
+        svc = svc[len("notify."):]
+    if not svc:
+        _log.warning("send_notify_service: empty service after stripping prefix")
+        return False
+    return _call_ha_service("notify", svc, {"title": title, "message": message})
 
 
 def send_monitor_notification(
