@@ -66,6 +66,23 @@ function showToast(msg, duration = 2200) {
 
 // ── API fetch ────────────────────────────────────────────────────
 async function api(path, opts = {}) {
+  // Auto-encode plain-object bodies as JSON. Without this, fetch() stringifies
+  // `{foo: 1}` to the literal text "[object Object]" and never sets the
+  // Content-Type header, so FastAPI replies 422 and the notification path
+  // (or any other JSON endpoint) is never actually called.
+  // Existing callers that pre-stringify keep working — strings are passed
+  // straight through and any explicit Content-Type they set wins.
+  if (opts.body && typeof opts.body === 'object'
+      && !(opts.body instanceof FormData)
+      && !(opts.body instanceof Blob)
+      && !(opts.body instanceof URLSearchParams)
+      && !(opts.body instanceof ArrayBuffer)) {
+    opts = {
+      ...opts,
+      body: JSON.stringify(opts.body),
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    };
+  }
   const res = await fetch(BASE + path, opts);
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
