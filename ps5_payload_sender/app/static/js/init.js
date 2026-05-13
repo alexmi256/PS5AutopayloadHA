@@ -62,6 +62,13 @@ async function init() {
   document.getElementById('btn-panel-wait-ok').addEventListener('click', builderAddWaitStep);
   document.getElementById('btn-panel-wait-x').addEventListener('click',  () => builderTogglePanel('wait'));
 
+  // (WAIT FOR LOADER step + P2JB preset removed — loader waiting is now
+  //  a flow-level option configured in Flow Notifications.)
+
+  document.getElementById('btn-add-notify').addEventListener('click',      () => builderTogglePanel('notify'));
+  document.getElementById('btn-panel-notify-ok').addEventListener('click', builderAddNotifyStep);
+  document.getElementById('btn-panel-notify-x').addEventListener('click',  () => builderTogglePanel('notify'));
+
   // Builder save / run
   document.getElementById('btn-builder-save').addEventListener('click', builderSave);
   document.getElementById('btn-builder-run').addEventListener('click', () => {
@@ -116,11 +123,18 @@ async function init() {
   await loadVersion();
   renderPayloadFilters();
   await refreshPayloads();
+  // Builder steps may have been restored from persisted state BEFORE
+  // state.payloads finished loading — at that point `_buildPayloadStep`
+  // couldn't resolve `p.source` so each payload step fell back to
+  // "Local file" and the version dropdown disappeared. Re-render now
+  // that state.payloads is populated.
+  if (builder.steps.length) builderRenderList();
   updatePayloadsSummary();
   updateBuilderSummary();
   await refreshProfiles();
   updateProfilesSummary();
   initCollapsible();
+  if (typeof initFlowNotify === 'function') await initFlowNotify();
   connectWS();
   // Non-blocking update check on startup (doesn't delay page load)
   if (state.sources.length) checkAllUpdates();

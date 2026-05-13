@@ -20,7 +20,7 @@
           <h1 class="header-title">PS5 Autopayload</h1>
         </div>
         <div class="header-controls">
-          <button id="btn-theme" class="btn btn-icon-btn" title="Light / Dark">☀</button>
+          <button id="btn-theme" class="btn btn-icon-btn" title="Light / Dark"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
           <span id="ws-indicator" class="ws-dot ws-offline" title="WebSocket"></span>
         </div>
       </div>
@@ -38,9 +38,9 @@
               <span class="toggle-slider"></span>
             </div>
           </label>
-          <button onclick="exportConfig()" class="btn btn-xs" title="Export config backup">⬇ Export</button>
-          <button onclick="importConfig()" class="btn btn-xs" title="Import config backup">⬆ Import</button>
-          <button onclick="resetConfig()"  class="btn btn-xs btn-danger" title="Factory reset — deletes all config">↺ Reset</button>
+          <button onclick="exportConfig()" class="btn btn-xs" title="Export config backup"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export</button>
+          <button onclick="importConfig()" class="btn btn-xs" title="Import config backup"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> Import</button>
+          <button onclick="resetConfig()"  class="btn btn-xs btn-danger" title="Factory reset — deletes all config"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-ccw" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset</button>
         </div>
       </div>
     </div>
@@ -58,7 +58,7 @@
           <select id="device-select" class="input select">
             <option value="">– Select device or enter IP below –</option>
           </select>
-          <button id="btn-manage-devices" class="btn btn-icon-btn" title="Manage devices">⚙</button>
+          <button id="btn-manage-devices" class="btn btn-icon-btn" title="Manage devices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
 
@@ -83,15 +83,15 @@
     <!-- PAYLOAD SOURCES (collapsible) -->
     <section class="card collapsible" id="section-sources">
       <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <span class="collapse-arrow open" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         <h2 class="card-title">Payload Sources</h2>
         <span class="collapse-summary" id="summary-sources"></span>
       </div>
       <div class="collapse-body">
         <div class="section-actions">
-          <button id="btn-add-source" class="btn btn-sm btn-primary">＋ Add Source</button>
-          <button id="btn-check-all-updates" class="btn btn-sm">↻ Check Updates</button>
-          <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none">⬆ Update All</button>
+          <button id="btn-add-source" class="btn btn-sm btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add Source</button>
+          <button id="btn-check-all-updates" class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Check Updates</button>
+          <button id="btn-update-all" class="btn btn-sm btn-primary" style="display:none"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> Update All</button>
         </div>
         <p class="section-hint">Add GitHub repositories to auto-detect and import payloads with version management.</p>
 
@@ -151,8 +151,8 @@
           </div>
           <div class="row-gap">
             <button id="btn-source-fetch" class="btn btn-primary btn-sm" style="flex:1">Detect Payloads</button>
-            <button id="btn-source-save"  class="btn btn-secondary btn-sm" onclick="saveSourceConfig()" style="display:none" title="Save config without re-scanning">💾 Save</button>
-            <button id="btn-source-panel-x" class="btn btn-sm" onclick="_closeSourcePanel()">✕</button>
+            <button id="btn-source-save"  class="btn btn-secondary btn-sm" onclick="saveSourceConfig()" style="display:none" title="Save config without re-scanning"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-save" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save</button>
+            <button id="btn-source-panel-x" class="btn btn-sm" onclick="_closeSourcePanel()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
           </div>
           <div id="source-add-status" class="source-status" style="margin-top:.4rem"></div>
 
@@ -185,13 +185,13 @@
     <!-- PAYLOADS (collapsible) -->
     <section class="card collapsible" id="section-payloads">
       <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <span class="collapse-arrow open" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         <h2 class="card-title">Payloads</h2>
         <span class="collapse-summary" id="summary-payloads"></span>
       </div>
       <div class="collapse-body">
         <div class="section-actions">
-          <button id="btn-refresh-payloads" class="btn btn-sm">↻ Refresh</button>
+          <button id="btn-refresh-payloads" class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Refresh</button>
           <label class="btn btn-sm">
             + Add Payload
             <input type="file" id="payload-upload" accept=".lua,.elf" multiple style="display:none" />
@@ -214,7 +214,7 @@
         <div id="bulk-action-bar" class="bulk-action-bar" style="display:none">
           <span id="bulk-count" class="bulk-count">0 selected</span>
           <button id="btn-bulk-deselect" class="btn btn-sm">Deselect All</button>
-          <button id="btn-bulk-delete" class="btn btn-sm btn-danger">✕ Delete Selected</button>
+          <button id="btn-bulk-delete" class="btn btn-sm btn-danger"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Delete Selected</button>
         </div>
 
         <div id="upload-progress" style="display:none;margin-bottom:.7rem">
@@ -231,16 +231,118 @@
     <!-- AUTO-LOAD BUILDER (collapsible) -->
     <section id="section-builder" class="card collapsible">
       <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <span class="collapse-arrow open" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         <h2 class="card-title">Auto-Load Builder</h2>
         <span class="collapse-summary" id="summary-builder"></span>
       </div>
       <div class="collapse-body">
+        <details class="flow-notify-block" id="flow-notify-card">
+          <summary>Flow Notifications</summary>
+          <div class="flow-notify-body">
+
+            <!-- Master toggle — replaces the WAIT FOR LOADER step entirely.
+                 When on, the flow waits for the configured loader port before
+                 running any payload step and the loader-related fields below
+                 become visible. -->
+            <label class="checkbox-label flow-loader-master">
+              <input type="checkbox" id="flow-wait-for-loader" />
+              <span><strong>Wait for loader / port before continuing</strong></span>
+            </label>
+            <p class="qs-subtitle" style="margin:.05rem 0 .4rem 1.7rem">
+              Use for long-running exploits like P2JB / Patience. The flow polls
+              the configured port and only continues once it answers.
+            </p>
+
+            <div class="field-label">Notify when</div>
+            <div class="p2jb-notif-grid">
+              <label class="checkbox-label flow-loader-only"><input type="checkbox" id="flow-notify-ready" checked /> Loader / port ready</label>
+              <label class="checkbox-label"><input type="checkbox" id="flow-notify-completed" checked /> Flow completed</label>
+              <label class="checkbox-label flow-loader-only"><input type="checkbox" id="flow-notify-failed" checked /> Timeout / failure</label>
+              <label class="checkbox-label advanced-only"><input type="checkbox" id="flow-notify-started" /> Flow started (advanced)</label>
+            </div>
+
+            <!-- Loader-watch config — visible only when the master toggle is on -->
+            <div id="flow-loader-config" class="flow-loader-cfg flow-loader-only">
+              <div class="field-label" style="margin-top:.6rem">Loader watch</div>
+              <div class="p2jb-grid">
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-port">Port to watch</label>
+                  <input type="number" id="flow-loader-port" class="input"
+                    value="9021" min="1" max="65535" />
+                  <small class="field-hint">9021 = ELF loader · 9026 = Remote Lua loader</small>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-interval">Check interval (s)</label>
+                  <input type="number" id="flow-loader-interval" class="input"
+                    value="30" min="5" max="600" />
+                  <small class="field-hint">Minimum 5 seconds</small>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="flow-loader-timeout">Timeout after (min)</label>
+                  <input type="number" id="flow-loader-timeout" class="input"
+                    value="180" min="1" max="1440" />
+                  <small class="field-hint">Flow fails after this</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group" style="margin-top:.5rem">
+              <label class="field-label" for="flow-notify-service">
+                Notification target (optional)
+              </label>
+              <input id="flow-notify-service" class="input"
+                placeholder="notify.mobile_app_your_phone" />
+              <small id="flow-notify-service-err" class="p2jb-test-warn" style="display:none">
+                Service must start with <code>notify.</code>
+              </small>
+              <small class="field-hint">
+                Leave empty to use the Home Assistant notification center only.
+              </small>
+            </div>
+
+            <label class="checkbox-label" id="flow-notify-persistent-row" style="margin-top:.4rem">
+              <input type="checkbox" id="flow-notify-persistent" checked />
+              <span>Also create HA persistent notification</span>
+            </label>
+
+            <!-- Advanced: notification tests -->
+            <div class="p2jb-advanced advanced-only">
+              <div class="field-label" style="display:flex; align-items:center; gap:.4rem">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                Advanced — Test notification routing
+              </div>
+              <p class="qs-subtitle" style="margin:.25rem 0 .55rem">
+                These buttons send a sample notification through the current
+                notify config. They do <strong>not</strong> start a flow.
+              </p>
+              <div class="p2jb-test-grid">
+                <button class="btn btn-secondary btn-sm" data-flow-test="persistent">Test persistent notification</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="service">Test custom notify service</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="loader_ready">Test loader-ready</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="flow_completed">Test flow-completed</button>
+                <button class="btn btn-secondary btn-sm" data-flow-test="flow_failed">Test flow-failed</button>
+              </div>
+              <div class="section-actions" style="margin-top:.55rem">
+                <button id="btn-flow-simulate" class="btn btn-warn btn-sm">Simulate Loader Ready</button>
+              </div>
+              <label class="checkbox-label p2jb-test-realflow">
+                <input type="checkbox" id="flow-test-realflow" />
+                <span>Run the selected/current flow after simulated loader ready</span>
+              </label>
+              <p id="flow-test-realflow-warn" class="p2jb-test-warn" style="display:none">
+                ⚠ This will run the saved flow <strong>for real</strong>
+                against the configured PS5 IP. Use with care.
+              </p>
+            </div>
+          </div>
+        </details>
+
 
         <div class="builder-add-btns">
-          <button id="btn-add-payload" class="btn btn-sm btn-primary">＋ Payload</button>
-          <button id="btn-add-delay"   class="btn btn-sm">＋ Delay</button>
-          <button id="btn-add-wait"    class="btn btn-sm">＋ Wait Port</button>
+          <button id="btn-add-payload" class="btn btn-sm btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Payload</button>
+          <button id="btn-add-delay"   class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Delay</button>
+          <button id="btn-add-wait"    class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Wait Port</button>
+          <button id="btn-add-notify"  class="btn btn-sm advanced-only" title="Fire a free-form notification inline. Most users don't need this — the flow already fires automatic notifications for loader-ready, completion, and timeout."><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Notify</button>
         </div>
 
         <!-- Payload panel -->
@@ -254,7 +356,7 @@
           <div class="row-gap">
             <input type="number" id="panel-payload-port" class="input advanced-only" placeholder="Port (auto)" min="1" max="65535" />
             <button id="btn-panel-payload-ok" class="btn btn-primary btn-sm advanced-only">Add</button>
-            <button id="btn-panel-payload-x"  class="btn btn-sm">✕ Close</button>
+            <button id="btn-panel-payload-x"  class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> Close</button>
           </div>
         </div>
 
@@ -268,8 +370,8 @@
           </div>
           <div class="row-gap" style="margin-top:.4rem">
             <input type="number" id="panel-delay-ms" class="input" placeholder="Custom ms …" min="1" />
-            <button id="btn-panel-delay-ok" class="btn btn-primary btn-sm">＋</button>
-            <button id="btn-panel-delay-x"  class="btn btn-sm">✕</button>
+            <button id="btn-panel-delay-ok" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+            <button id="btn-panel-delay-x"  class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
           </div>
         </div>
 
@@ -294,9 +396,33 @@
           </details>
           <div class="row-gap" style="margin-top:.4rem">
             <button id="btn-panel-wait-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
-            <button id="btn-panel-wait-x"  class="btn btn-sm">✕</button>
+            <button id="btn-panel-wait-x"  class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
           </div>
         </div>
+
+        <!-- Notify panel (Advanced Mode only — most users don't need this) -->
+        <div id="panel-notify" class="add-panel advanced-only" style="display:none">
+          <div class="field-group">
+            <label class="field-label" for="panel-notify-title">Title</label>
+            <input type="text" id="panel-notify-title" class="input" placeholder="e.g. Loader ready" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="panel-notify-msg">Message (optional)</label>
+            <input type="text" id="panel-notify-msg" class="input" placeholder="Body text — leave empty for title only" />
+          </div>
+          <div class="field-group advanced-only">
+            <label class="field-label" for="panel-notify-svc">
+              Override <code>notify.&lt;service&gt;</code> (optional)
+            </label>
+            <input type="text" id="panel-notify-svc" class="input" placeholder="notify.something — leave empty to use flow default" />
+          </div>
+          <div class="row-gap">
+            <button id="btn-panel-notify-ok" class="btn btn-primary btn-sm" style="flex:1">Add</button>
+            <button id="btn-panel-notify-x"  class="btn btn-sm">Close</button>
+          </div>
+        </div>
+
+        <!-- Per-flow notification config -->
 
         <hr class="divider" />
 
@@ -308,8 +434,8 @@
           <div class="row-gap builder-footer">
             <input type="text" id="builder-profile-name" class="input"
               placeholder="Flow name" />
-            <button id="btn-builder-save" class="btn btn-secondary" title="Save as flow">💾</button>
-            <button id="btn-builder-run"  class="btn btn-primary btn-xl">▶ Run</button>
+            <button id="btn-builder-save" class="btn btn-secondary" title="Save as flow"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-save" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg></button>
+            <button id="btn-builder-run"  class="btn btn-primary btn-xl"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg> Run</button>
           </div>
           <button onclick="exportAutoloadZip()" class="btn btn-sm btn-block"
             style="margin-top:.4rem"
@@ -317,19 +443,30 @@
             ⬇ Export autoload.zip (USB)
           </button>
         </div>
+
+        <!-- Recent flow runs -->
+        <div class="p2jb-history-block" id="flow-history-block">
+          <div class="p2jb-history-head">
+            <span class="field-label">Recent flow runs</span>
+            <button id="btn-flow-clear-history" class="btn btn-ghost btn-sm" title="Clear history">Clear</button>
+          </div>
+          <ul id="flow-history-list" class="p2jb-history-list">
+            <li class="p2jb-history-empty">No runs yet.</li>
+          </ul>
+        </div>
       </div>
     </section>
 
     <!-- SAVED PROFILES (collapsible) -->
     <section class="card collapsible" id="section-profiles">
       <div class="collapse-header">
-        <span class="collapse-arrow open" aria-hidden="true">▶</span>
+        <span class="collapse-arrow open" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
         <h2 class="card-title">Saved Flows</h2>
         <span class="collapse-summary" id="summary-profiles"></span>
       </div>
       <div class="collapse-body">
         <div class="section-actions">
-          <button id="btn-refresh-profiles" class="btn btn-sm">↻ Refresh</button>
+          <button id="btn-refresh-profiles" class="btn btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Refresh</button>
         </div>
         <label class="checkbox-label" style="margin-bottom:.75rem">
           <input type="checkbox" id="continue-on-error" />
@@ -377,7 +514,7 @@
               <option value="port">Port</option>
               <option value="payload">Payload</option>
             </select>
-            <button onclick="exportLog('txt')" class="btn btn-xs">⬇ TXT</button>
+            <button onclick="exportLog('txt')" class="btn btn-xs"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> TXT</button>
             <button id="btn-clear-log" class="btn btn-xs">Clear</button>
           </div>
         </div>
@@ -453,7 +590,9 @@
     </div>
   </div>
 
-  <!-- JS modules – load order matters (state first, init last) -->
+  <!-- JS modules – load order matters (icons first so everything can use icon(),
+       then state, then components, then init). -->
+  <script src="static/js/icons.js"></script>
   <script src="static/js/state.js"></script>
   <script src="static/js/StatusLog.js"></script>
   <script src="static/js/ws.js"></script>
@@ -466,6 +605,7 @@
   <script src="static/js/PayloadSources.js"></script>
   <script src="static/js/ConfigBackup.js"></script>
   <script src="static/js/PortTiming.js"></script>
+  <script src="static/js/FlowNotify.js"></script>
   <script src="static/js/CollapsibleSections.js"></script>
   <script src="static/js/init.js"></script>
 </body>

@@ -37,15 +37,15 @@ function renderFavorites() {
     tile.disabled  = isOtherOne;
     tile.title     = isThisOne ? `Stop ${name.replace(/\.txt$/i, '')}` : `Run ${name.replace(/\.txt$/i, '')}`;
 
-    const icon = document.createElement('span');
-    icon.className   = 'qs-tile-icon';
-    icon.textContent = isThisOne ? '■' : '▶';
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'qs-tile-icon';
+    iconSpan.innerHTML = isThisOne ? icon('square', {filled:true}) : icon('play');
 
     const label = document.createElement('span');
     label.className  = 'qs-tile-label';
     label.textContent = name.replace(/\.txt$/i, '');
 
-    tile.appendChild(icon);
+    tile.appendChild(iconSpan);
     tile.appendChild(label);
 
     tile.addEventListener('click', () => {

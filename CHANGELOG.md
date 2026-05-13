@@ -1,5 +1,45 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.2] – 2026-05-13
+
+### P2JB-Compatible Flow Notifications
+
+Flows can now automatically wait for the PS5 loader to become ready before sending payloads — no more sitting at the console watching the screen:
+
+- Supports **ELF Loader** (port 9021) and **Remote Lua Loader** (port 9026)
+- Home Assistant notifications are sent when the loader is ready, the flow completes, or a timeout/failure occurs
+- Notification settings (service, custom messages, timeout) are saved per flow and work with any `notify.*` service
+
+### Simplified Architecture
+
+- Removed the separate **WAIT FOR LOADER** builder step — port waiting is now built into the flow runner itself
+- Removed the **Create P2JB Flow** helper — flows are created directly in the builder with the same result
+
+### UI Improvements
+
+- Inline SVG icons (Lucide) replace emoji/unicode glyphs — consistent rendering on all browsers and operating systems, including Safari on macOS and iOS
+- Switched to **Roboto** — the same font Home Assistant uses — so the add-on UI blends naturally into the HA shell
+- Multi-select for pending payload updates: choose which payloads to update instead of applying all at once (both per-source panel and global Update All)
+- Source cards now show a highlighted background and an update badge when updates are available
+- Cleaner notification configuration panel in the flow builder
+
+### Reliability
+
+- All config files now use atomic writes — a power loss or OOM-kill during a save can no longer produce a corrupted or truncated file; you will always see either the previous valid state or the new one
+- Static assets (JS/CSS) are cache-busted on every update — browsers automatically fetch the latest version without a manual hard-reload
+
+### Bug Fixes
+
+- Update check no longer misses repos whose release assets have versioned filenames (e.g. `ShadowMountPlus_1.6test8-fix1.zip`)
+- Global "Check Updates" and per-source "Check" now use the same detection rule — no more inconsistent results between the two
+- Multi-update apply no longer leaves the panel in a stale state after updating
+- Per-source "↻ Check" panel now opens correctly and shows the error message on failure instead of silently doing nothing
+- Sources unavailable during update checks (rate-limited, no releases, network error) now report an error instead of silently disappearing from the result
+
+---
+
 ## [1.1.1] – 2026-04-19
 
 ### New Features

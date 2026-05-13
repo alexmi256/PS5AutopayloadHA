@@ -29,14 +29,16 @@ OLD_STATE_FILE   = Path("/data/state.json")
 OLD_DEVICES_FILE = Path("/data/devices.json")
 
 # ── Misc ──────────────────────────────────────────────────────────
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 MAX_PAYLOAD_VERSIONS  = 5     # versions kept per payload
 MAX_TIMING_ENTRIES    = 10    # timing samples kept per port
 MAX_LOG_ENTRIES       = 500   # log entries kept in history
 MAX_FLOW_RUNS         = 10    # flow analysis runs stored
+MAX_FLOW_HISTORY      = 10    # high-level flow runs kept (date + result)
 
-TIMING_FILE    = CONFIG_BASE / "port_timing.json"
-FLOW_RUNS_FILE = CONFIG_BASE / "flow_runs.json"
+TIMING_FILE       = CONFIG_BASE / "port_timing.json"
+FLOW_RUNS_FILE    = CONFIG_BASE / "flow_runs.json"
+FLOW_HISTORY_FILE = CONFIG_BASE / "flow_history.json"
 GITHUB_RAW_CONFIG = (
     "https://raw.githubusercontent.com/cosmicflow2512/PS5AutopayloadHA"
     "/main/ps5_payload_sender/config.yaml"

@@ -8,7 +8,6 @@ async function refreshProfiles() {
     renderProfileList();
     renderFavorites();
     if (typeof updateProfilesSummary === 'function') updateProfilesSummary();
-    if (typeof populateFlowSelector === 'function') populateFlowSelector(state.profiles);
   } catch (e) { log('Load profiles: ' + e.message, 'error'); }
 }
 
@@ -34,7 +33,7 @@ function renderProfileList() {
     // Favorite / pin button
     const favBtn = document.createElement('button');
     favBtn.className   = `btn btn-sm${isFav ? ' fav-active' : ''}`;
-    favBtn.textContent = isFav ? '📌 Pinned' : 'Pin to Quick Start ⭐';
+    favBtn.innerHTML  = isFav ? icon('star', {filled:true}) + ' Pinned' : 'Pin to Quick Start ' + icon('star');
     favBtn.title       = isFav ? 'Unpin from Quick Start' : 'Pin to Quick Start';
     favBtn.addEventListener('click', () => toggleFavorite(name));
 
@@ -53,7 +52,7 @@ function renderProfileList() {
     // Run / Stop button — transforms based on global exec state
     const runBtn = document.createElement('button');
     runBtn.className   = 'btn btn-sm ' + (isThisOne ? 'btn-danger' : 'btn-primary');
-    runBtn.textContent = isThisOne ? '■' : '▶';
+    runBtn.innerHTML  = isThisOne ? icon('square', {filled:true}) : icon('play');
     runBtn.title       = isThisOne ? 'Stop' : 'Run';
     runBtn.disabled    = isOtherOne;
     runBtn.addEventListener('click', () => {
@@ -66,7 +65,7 @@ function renderProfileList() {
 
     // Delete button
     const delBtn = document.createElement('button');
-    delBtn.className   = 'btn btn-sm btn-danger'; delBtn.textContent = '✕';
+    delBtn.className   = 'btn btn-sm btn-danger'; delBtn.innerHTML  = icon('x');
     delBtn.title       = 'Delete';
     delBtn.disabled    = isActive;
     delBtn.addEventListener('click', async () => {
@@ -93,7 +92,7 @@ function toggleFavorite(name) {
     showToast(`Removed from Quick Start`);
   } else {
     state.favorites.push(name);
-    showToast(`Added to Quick Start ⭐`);
+    showToast(`Added to Quick Start ★`);
   }
   renderProfileList(); renderFavorites(); scheduleSave();
 }
@@ -120,7 +119,7 @@ async function runProfile(name, btn) {
     } else {
       log('Run: ' + e.message, 'error');
     }
-    if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+    if (btn) { btn.disabled = false; btn.innerHTML  = icon('play'); }
   }
   // Success: WS exec_state message drives the full UI update
 }
@@ -133,6 +132,9 @@ async function editProfile(name) {
     }
     builder.steps = data.steps;
     document.getElementById('builder-profile-name').value = name.replace(/\.txt$/i, '');
+    if (data.notify_config && typeof flowNotifyApplyConfig === 'function') {
+      flowNotifyApplyConfig(data.notify_config);
+    }
     builderRenderList(); scheduleSave();
     document.getElementById('builder-card').scrollIntoView({ behavior: 'smooth' });
     log(`Profile '${name}' loaded into builder`, 'success');

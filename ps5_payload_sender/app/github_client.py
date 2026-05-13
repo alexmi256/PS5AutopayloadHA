@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 import json
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 import zipfile
@@ -19,6 +20,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 GITHUB_API = "https://api.github.com"
+
+# Hosts download_payload() will fetch from. Every URL the add-on hands to
+# urlopen() ultimately originates from a GitHub API response (release asset
+# browser_download_url, raw.githubusercontent.com for repo files), so locking
+# the download path to known GitHub hosts is essentially free and blocks SSRF
+# via tampered payload metadata.
+_ALLOWED_DOWNLOAD_HOSTS = frozenset({
+    "github.com",
+    "api.github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "codeload.github.com",
+})
 
 def _build_headers() -> dict:
     from config import GITHUB_TOKEN
@@ -30,16 +44,16 @@ def _build_headers() -> dict:
         h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
     return h
 
-_HEADERS = _build_headers()
 _PAYLOAD_EXTENSIONS = {".elf", ".lua"}
 
 # ── In-memory tree cache ──────────────────────────────────────────
 _tree_cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
 _CACHE_TTL = 300  # seconds
+_CACHE_MAX = 100  # hard cap; oldest entry evicted when exceeded
 
 
 def _gh_get(url: str, timeout: int = 15) -> Any:
-    req = urllib.request.Request(url, headers=_HEADERS)
+    req = urllib.request.Request(url, headers=_build_headers())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
@@ -85,6 +99,9 @@ def scan_repo_files(
             return _filter_by_folder(cached, folder)
 
     result = _do_scan_repo_files(owner, repo)
+    if len(_tree_cache) >= _CACHE_MAX:
+        oldest_key = min(_tree_cache, key=lambda k: _tree_cache[k][0])
+        _tree_cache.pop(oldest_key, None)
     _tree_cache[key] = (now, result)
     return _filter_by_folder(result, folder)
 
@@ -176,7 +193,16 @@ def get_releases(owner: str, repo: str) -> List[Dict[str, Any]]:
 
 # ── Download helpers ──────────────────────────────────────────────
 
+def _assert_allowed_url(url: str) -> None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Refusing non-https download URL: {url}")
+    if parsed.hostname not in _ALLOWED_DOWNLOAD_HOSTS:
+        raise ValueError(f"Refusing download from unknown host: {parsed.hostname}")
+
+
 def download(url: str) -> bytes:
+    _assert_allowed_url(url)
     req = urllib.request.Request(url, headers={
         "User-Agent": "PS5AutopayloadHA/1.0",
         "Accept": "application/octet-stream",
@@ -208,12 +234,26 @@ def _is_zip(data: bytes) -> bool:
 
 def _extract_from_zip(data: bytes, prefer_name: Optional[str]) -> Tuple[bytes, str]:
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        names = zf.namelist()
         candidates = [
-            n for n in zf.namelist()
+            n for n in names
             if Path(n).suffix.lower() in _PAYLOAD_EXTENSIONS
         ]
         if not candidates:
-            raise ValueError("No valid payload (.elf/.lua) found in archive")
+            # Surface what IS in the archive so the user can tell whether
+            # the release shipped source code, a different artefact, or
+            # the wrong file. Backend's HTTPException(502, …) bubbles
+            # this string up to the UI's failed-row error chip.
+            preview = ", ".join(names[:8])
+            if len(names) > 8:
+                preview += f", … (+{len(names) - 8} more)"
+            raise ValueError(
+                f"No .elf or .lua found in archive. "
+                f"Archive contains: {preview}. "
+                f"This release probably ships source code instead of a "
+                f"drop-in payload — re-add the source pointing at a "
+                f"specific file URL, or skip this update."
+            )
         target = next(
             (n for n in candidates if Path(n).name == prefer_name),
             candidates[0],

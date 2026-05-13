@@ -6,7 +6,7 @@
 
 ### Fully Automated PS5 Payload Execution via Home Assistant
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=flat-square)](https://github.com/cosmicflow2512/PS5AutopayloadHA)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue?style=flat-square)](https://github.com/cosmicflow2512/PS5AutopayloadHA)
 [![HA](https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5?style=flat-square&logo=home-assistant)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
@@ -94,8 +94,8 @@ The ELF Loader:
 - Export autoload.zip for USB-based delivery
 - GitHub Payload Sources — import directly from any public repo
 - Automatic update checks for all sources
-- Version history per payload (up to 3 versions, auto-pruned)
-- Favorites system for payloads and profiles
+- Version history per payload (up to 5 versions, auto-pruned)
+- Favorites system for payloads and flows
 - Search & filtering (type, name, favorites)
 - Quick Start — pin profiles for instant one-tap execution
 - Device Manager — save and switch between multiple PS5 IPs
@@ -355,5 +355,5 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <div align="center">
-  <sub>Built for Home Assistant · Tested on HA OS · v1.1.0</sub>
+  <sub>Built for Home Assistant · Tested on HA OS · v1.1.1</sub>
 </div>

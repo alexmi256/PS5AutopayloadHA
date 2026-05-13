@@ -28,7 +28,7 @@ function renderPayloads() {
       query
         ? 'No payloads found.'
         : state.payloadFilter === 'favorites'
-          ? 'No favorites yet. Click ⭐ on a payload to add it.'
+          ? 'No favorites yet. Click ★ on a payload to add it.'
           : 'No payloads. Upload a .lua or .elf file.'
     }</div>`;
     renderBulkBar();
@@ -106,13 +106,13 @@ function buildPayloadItem(p) {
 
   const favBtn = document.createElement('button');
   favBtn.className   = 'p-fav' + (isFav ? ' p-fav-active' : '');
-  favBtn.textContent = '⭐';
+  favBtn.innerHTML  = icon('star', {filled:true});
   favBtn.title       = isFav ? 'Remove from favorites' : 'Add to favorites';
   favBtn.addEventListener('click', e => { e.stopPropagation(); togglePayloadFavorite(p.name); });
 
   const sendBtn = document.createElement('button');
   sendBtn.className   = 'p-send';
-  sendBtn.textContent = '▶ Send to PS5';
+  sendBtn.innerHTML  = icon('play') + ' Send to PS5';
   sendBtn.addEventListener('click', async e => {
     e.stopPropagation();
     await sendDirect(p.name, p.auto_port, portInput, sendBtn);
@@ -120,7 +120,7 @@ function buildPayloadItem(p) {
 
   const del = document.createElement('button');
   del.className   = 'p-del';
-  del.textContent = '✕';
+  del.innerHTML  = icon('x');
   del.title       = 'Delete';
   del.addEventListener('click', async e => {
     e.stopPropagation();
@@ -210,7 +210,7 @@ function buildPayloadItem(p) {
       // New version available
       const warnEl = document.createElement('span');
       warnEl.className   = 'payload-update-warn';
-      warnEl.textContent = `⚠ ${updateInfo.latest_version}`;
+      warnEl.innerHTML  = icon('alert-triangle') + ` ${updateInfo.latest_version}`;
       warnEl.title       = 'New version available on GitHub';
       const updBtn = document.createElement('button');
       updBtn.className   = 'btn btn-sm source-update-btn';
@@ -250,7 +250,10 @@ function buildPayloadItem(p) {
       rowSrc.appendChild(upToDate);
     }
 
-    // ── Builder / saved-flow usage: "Update flows" button or simple badge ──
+    // ── Builder / saved-flow usage: "Apply to flows" button or simple badge ──
+    // (Distinct from the "Update flows" button above: this one applies the
+    // currently-selected dropdown version to all flows that reference this
+    // payload, while "Update flows" pulls a newer version from GitHub.)
     {
       const builderMatches = builder.steps
         .map((s, idx) => ({ step: s, idx }))
@@ -258,9 +261,9 @@ function buildPayloadItem(p) {
       const hasMultiVer = (Array.isArray(p.source && p.source.versions) ? p.source.versions : []).length > 1;
       if (builderMatches.length && hasMultiVer) {
         const updBtn = document.createElement('button');
-        updBtn.className   = 'btn btn-sm';
-        updBtn.textContent = 'Update flows';
-        updBtn.title       = 'Update all flows using this payload to the selected version';
+        updBtn.className   = 'btn btn-sm source-apply-btn';
+        updBtn.textContent = 'Apply to flows';
+        updBtn.title       = 'Apply the currently selected version to every flow that uses this payload';
         updBtn.addEventListener('click', async ev => {
           ev.stopPropagation();
           updBtn.disabled    = true;
@@ -285,7 +288,7 @@ function buildPayloadItem(p) {
             console.log('Only 1 usage found. All flows:', state.profiles);
           }
           updBtn.disabled    = false;
-          updBtn.textContent = 'Update flows';
+          updBtn.textContent = 'Apply to flows';
           _openUpdateUsagesDialog(p, builderMatches, usedInProfiles, flowDetails);
         });
         rowSrc.appendChild(updBtn);
@@ -353,7 +356,7 @@ async function sendDirect(filename, autoPort, portInput, btn) {
     log('Send: ' + e.message, 'error');
     btn.textContent = 'Failed ❌'; btn.className = 'p-send err';
   }
-  setTimeout(() => { btn.disabled = false; btn.textContent = '▶ Send to PS5'; btn.className = 'p-send'; }, 2500);
+  setTimeout(() => { btn.disabled = false; btn.innerHTML  = icon('play') + ' Send to PS5'; btn.className = 'p-send'; }, 2500);
 }
 
 async function bulkDeleteSelected() {
@@ -543,7 +546,7 @@ function _openUpdateUsagesDialog(p, stepMatches, usedInProfiles, flowDetails) {
 
   const title = document.createElement('div');
   title.className   = 'modal-title';
-  title.textContent = `Update flows — ${p.name}`;
+  title.textContent = `Apply to flows — ${p.name}`;
   box.appendChild(title);
 
   const verInfo = document.createElement('div');

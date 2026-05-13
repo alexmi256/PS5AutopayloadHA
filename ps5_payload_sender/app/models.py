@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SendRequest(BaseModel):
@@ -59,6 +59,9 @@ class SwitchVersionRequest(BaseModel):
     asset_name: str
     download_url: str
     version: str
+    # Git blob SHA, when the source is a repo file (folder mode). Used to
+    # detect content updates without a release/tag changing.
+    sha: str = ""
 
 
 class SetDefaultVersionRequest(BaseModel):
@@ -72,26 +75,6 @@ class AnalyzePortRequest(BaseModel):
     interval: float = 0.5
 
 
-class FlowStepModel(BaseModel):
-    type: str                           # 'payload' | 'delay' | 'wait_port'
-    # payload fields
-    filename: str = ""
-    autoPort: int = 0
-    portOverride: Optional[int] = None
-    # delay fields
-    ms: int = 0
-    # wait_port fields
-    port: int = 0
-    timeout: float = 60.0
-    interval_ms: int = 500
-
-
-class FlowAnalyzeRequest(BaseModel):
-    host: str
-    steps: List[FlowStepModel]
-    safe_mode: bool = True
-
-
 class SourceUpdateRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"
@@ -102,3 +85,67 @@ class SourceUpdateRequest(BaseModel):
 class PatchFlowVersionsRequest(BaseModel):
     filename: str
     version: str
+
+
+class FlowNotifyConfig(BaseModel):
+    """Per-flow notification preferences (matches the ``# ~notify …``
+    header in the saved profile)."""
+    # Event toggles
+    loader_ready:            bool = True
+    flow_started:            bool = False
+    flow_completed:          bool = True
+    flow_failed:             bool = True
+    # Delivery
+    service:                 str  = ""      # must start with "notify." if set
+    persistent:              bool = True    # HA notification center
+    # Loader-watch master switch (replaces the WAIT FOR LOADER step)
+    wait_for_loader_enabled: bool = False
+    # Loader-watch config (also used as defaults for legacy ?? directives)
+    loader_port:             int  = 9021
+    loader_interval_s:       int  = 30
+    loader_max_wait_s:       int  = 10800   # 3 h
+
+    @field_validator("service")
+    @classmethod
+    def _service_must_start_with_notify(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v and not v.startswith("notify."):
+            raise ValueError("notify service must start with 'notify.'")
+        return v
+
+    @field_validator("loader_port")
+    @classmethod
+    def _port_in_range(cls, v: int) -> int:
+        if not (1 <= int(v) <= 65535):
+            raise ValueError("loader_port must be between 1 and 65535")
+        return int(v)
+
+    @field_validator("loader_interval_s")
+    @classmethod
+    def _interval_min(cls, v: int) -> int:
+        if int(v) < 5:
+            raise ValueError("loader_interval_s must be at least 5 seconds")
+        return int(v)
+
+    @field_validator("loader_max_wait_s")
+    @classmethod
+    def _max_wait_min(cls, v: int) -> int:
+        if int(v) < 60:
+            raise ValueError("loader_max_wait_s must be at least 60 seconds (1 minute)")
+        return int(v)
+
+
+class FlowNotifyTestRequest(BaseModel):
+    """Body for /api/flow/test_notification (Advanced Mode tools).
+
+    ``event`` ∈ ``{persistent, service, loader_ready, flow_started,
+    flow_completed, flow_failed, simulate_loader_ready}``.
+    For ``simulate_loader_ready`` the optional ``run_flow`` field
+    indicates whether the user opted to also run *flow_name* for real.
+    """
+    event: str
+    notify: FlowNotifyConfig = FlowNotifyConfig()
+    host: str = ""
+    port: int = 9021
+    flow_name: str = ""
+    run_flow: bool = False

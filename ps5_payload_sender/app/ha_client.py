@@ -4,6 +4,7 @@ Home Assistant API client helpers:
   - write services.yaml with current profile list
   - reload HA config entry
   - fetch remote version from GitHub
+  - send notifications (persistent + configurable notify.* service)
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import logging
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from config import APP_VERSION, PROFILES_DIR, SUPERVISOR_TOKEN, HIDDEN_PROFILES
 
@@ -183,6 +184,82 @@ def reload_integration() -> dict:
     except Exception as exc:
         _log.error("HA reload error: %s", exc)
         return {"success": False, "error": str(exc)}
+
+
+# ── Notifications ──────────────────────────────────────────────────
+
+def _call_ha_service(domain: str, service: str, data: dict, timeout: float = 5.0) -> bool:
+    """POST /core/api/services/{domain}/{service}. Returns True on HTTP 2xx."""
+    if not SUPERVISOR_TOKEN:
+        _log.debug("HA service call skipped — no SUPERVISOR_TOKEN")
+        return False
+    url = f"http://supervisor/core/api/services/{domain}/{service}"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode(),
+            headers={
+                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return 200 <= resp.status < 300
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")[:200]
+        _log.error("HA service %s.%s HTTP %s: %s | %s", domain, service, exc.code, exc.reason, body)
+    except Exception as exc:
+        _log.error("HA service %s.%s error: %s", domain, service, exc)
+    return False
+
+
+def send_persistent_notification(title: str, message: str) -> bool:
+    """Create a HA persistent_notification (shows in HA's notification center)."""
+    return _call_ha_service(
+        "persistent_notification", "create",
+        {"title": title, "message": message},
+    )
+
+
+def send_notify_service(service: str, title: str, message: str) -> bool:
+    """Call ``notify.<service>``.
+
+    The user-facing config always carries the ``notify.`` prefix (it's
+    validated to start with it). Strip it here so the REST URL becomes
+    ``/core/api/services/notify/<service>`` rather than the broken
+    ``/core/api/services/notify/notify.<service>``.
+    """
+    svc = service.strip()
+    if svc.startswith("notify."):
+        svc = svc[len("notify."):]
+    if not svc:
+        _log.warning("send_notify_service: empty service after stripping prefix")
+        return False
+    return _call_ha_service("notify", svc, {"title": title, "message": message})
+
+
+def send_monitor_notification(
+    title: str, message: str, notify_service: Optional[str] = None,
+    *, persistent: bool = True,
+) -> dict:
+    """Create an HA persistent_notification by default and optionally also
+    call notify.<service>. ``persistent`` can be turned off so a service
+    target receives the notification without a duplicate appearing in
+    HA's notification center.
+
+    Returns ``{"persistent": bool | None, "service": bool | None}``.
+    """
+    pn_ok: Optional[bool] = None
+    if persistent:
+        pn_ok = send_persistent_notification(title, message)
+    svc_ok: Optional[bool] = None
+    if notify_service:
+        svc_ok = send_notify_service(notify_service, title, message)
+    if pn_ok is None and svc_ok is None:
+        _log.warning("Notification dispatched with no delivery channel enabled")
+    _log.info("Monitor notification sent: persistent=%s service=%s", pn_ok, svc_ok)
+    return {"persistent": pn_ok, "service": svc_ok}
 
 
 # ── Remote version check ──────────────────────────────────────────

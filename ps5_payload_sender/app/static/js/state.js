@@ -30,7 +30,7 @@ const builder = { steps: [] };
 function initTheme() {
   const saved = sessionStorage.getItem('ps5_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
-  document.getElementById('btn-theme').textContent = saved === 'dark' ? '☀' : '🌙';
+  document.getElementById('btn-theme').innerHTML  = saved === 'dark' ? icon('sun') : icon('moon');
 }
 
 function toggleTheme() {
@@ -38,7 +38,7 @@ function toggleTheme() {
   const next = cur === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   sessionStorage.setItem('ps5_theme', next);
-  document.getElementById('btn-theme').textContent = next === 'dark' ? '☀' : '🌙';
+  document.getElementById('btn-theme').innerHTML  = next === 'dark' ? icon('sun') : icon('moon');
 }
 
 // ── Advanced Mode ─────────────────────────────────────────────────
@@ -66,6 +66,23 @@ function showToast(msg, duration = 2200) {
 
 // ── API fetch ────────────────────────────────────────────────────
 async function api(path, opts = {}) {
+  // Auto-encode plain-object bodies as JSON. Without this, fetch() stringifies
+  // `{foo: 1}` to the literal text "[object Object]" and never sets the
+  // Content-Type header, so FastAPI replies 422 and the notification path
+  // (or any other JSON endpoint) is never actually called.
+  // Existing callers that pre-stringify keep working — strings are passed
+  // straight through and any explicit Content-Type they set wins.
+  if (opts.body && typeof opts.body === 'object'
+      && !(opts.body instanceof FormData)
+      && !(opts.body instanceof Blob)
+      && !(opts.body instanceof URLSearchParams)
+      && !(opts.body instanceof ArrayBuffer)) {
+    opts = {
+      ...opts,
+      body: JSON.stringify(opts.body),
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    };
+  }
   const res = await fetch(BASE + path, opts);
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
@@ -124,6 +141,10 @@ async function persistState() {
         payload_filter:       state.payloadFilter,
         builder_steps:        builder.steps,
         builder_profile_name: document.getElementById('builder-profile-name').value,
+        // Flow Notifications config — keep the user's in-progress
+        // settings across reloads, just like builder_steps.
+        flow_notify_config:   typeof flowNotifyReadConfig === 'function'
+                                ? flowNotifyReadConfig() : null,
       }),
     });
   } catch (_) { /* silent */ }
@@ -151,6 +172,8 @@ async function loadPersistedState() {
     }
     if (saved.builder_profile_name)
       document.getElementById('builder-profile-name').value = saved.builder_profile_name;
+    if (saved.flow_notify_config && typeof flowNotifyApplyConfig === 'function')
+      flowNotifyApplyConfig(saved.flow_notify_config);
   } catch (_) { /* first run */ }
 }
 

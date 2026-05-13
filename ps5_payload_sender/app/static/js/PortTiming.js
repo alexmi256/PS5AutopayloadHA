@@ -53,7 +53,7 @@ async function analyzePort() {
   } catch (e) {
     showToast('Analyze failed: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Analyze'; }
+    if (btn) { btn.disabled = false; btn.innerHTML  = icon('play') + ' Analyze'; }
   }
 }
 

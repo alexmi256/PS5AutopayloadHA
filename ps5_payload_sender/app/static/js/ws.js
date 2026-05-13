@@ -48,5 +48,10 @@ function handleWS(msg) {
   if (msg.type === 'status') {
     log(msg.message, msg.level || 'info');
     handleBuilderStepStatus(msg);
+    return;
+  }
+  if (msg.type === 'flow_wait_check' || msg.type === 'flow_simulation') {
+    if (typeof handleFlowNotifyEvent === 'function') handleFlowNotifyEvent(msg);
+    return;
   }
 }

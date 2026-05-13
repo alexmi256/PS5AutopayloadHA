@@ -6,11 +6,14 @@ Persistent storage helpers:
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
+import zipfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
+from atomic_write import atomic_write_bytes, atomic_write_text
 from config import (
     ALLOWED_PAYLOAD_EXTENSIONS,
     CONFIG_BASE,
@@ -21,6 +24,7 @@ from config import (
     OLD_DEVICES_FILE,
     OLD_PAYLOAD_DIR,
     OLD_STATE_FILE,
+    FLOW_HISTORY_FILE,
     PAYLOAD_DIR,
     PAYLOAD_META_FILE,
     PROFILES_DIR,
@@ -85,9 +89,7 @@ def load_devices() -> List[Dict[str, Any]]:
 
 
 def save_devices(devices: List[Dict[str, Any]]) -> None:
-    DEVICES_FILE.write_text(
-        json.dumps(devices, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(DEVICES_FILE, json.dumps(devices, ensure_ascii=False, indent=2))
 
 
 # ── UI state ──────────────────────────────────────────────────────
@@ -102,9 +104,7 @@ def load_ui_state() -> dict:
 
 
 def save_ui_state(data: dict) -> None:
-    STATE_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(STATE_FILE, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 # ── Directory listings ────────────────────────────────────────────
@@ -121,9 +121,7 @@ def load_sources() -> List[Dict[str, Any]]:
 
 
 def save_sources(sources: List[Dict[str, Any]]) -> None:
-    SOURCES_FILE.write_text(
-        json.dumps(sources, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(SOURCES_FILE, json.dumps(sources, ensure_ascii=False, indent=2))
 
 
 # ── Payload metadata ──────────────────────────────────────────────
@@ -138,9 +136,7 @@ def load_payload_meta() -> Dict[str, Any]:
 
 
 def save_payload_meta(meta: Dict[str, Any]) -> None:
-    PAYLOAD_META_FILE.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    atomic_write_text(PAYLOAD_META_FILE, json.dumps(meta, ensure_ascii=False, indent=2))
 
 
 # ── Directory listings ────────────────────────────────────────────
@@ -161,7 +157,25 @@ def list_payloads() -> List[dict]:
             if f.name in meta:
                 src = dict(meta[f.name])
                 versions = src.get("versions") or []
-                src["latest_version"] = versions[0]["tag"] if versions else src.get("version", "")
+                # Pick the most recently published version as "latest".
+                # If no entry carries a published_at (legacy meta from
+                # before we persisted that field), fall back to whatever
+                # version the user actually has installed — that's at
+                # least a version they recently interacted with, and
+                # picking it as "latest" is far less misleading than
+                # the previous tier-based heuristic which mislabelled
+                # beta as latest when a test build was actually newer.
+                installed_tag = src.get("version", "")
+                dated = [v for v in versions if v.get("published_at")]
+                if dated:
+                    newest = max(dated, key=lambda v: v["published_at"])
+                    src["latest_version"] = newest["tag"]
+                elif versions and any(v["tag"] == installed_tag for v in versions):
+                    src["latest_version"] = installed_tag
+                elif versions:
+                    src["latest_version"] = versions[0]["tag"]
+                else:
+                    src["latest_version"] = installed_tag
                 entry["source"] = src
             result.append(entry)
     return result
@@ -177,15 +191,20 @@ def list_profiles() -> List[str]:
 # ── Version helpers ───────────────────────────────────────────────
 
 def sort_versions(versions: list) -> list:
-    """Stable-sort versions: stable releases → beta → alpha/test."""
-    def _tier(v: dict) -> int:
-        tag = v.get("tag", "").lower()
-        if "alpha" in tag or "test" in tag:
-            return 2
-        if "beta" in tag:
-            return 1
-        return 0
-    return sorted(versions, key=_tier)
+    """Sort versions newest-first by their GitHub ``published_at``
+    timestamp. Entries without a date keep their relative order
+    behind the dated ones (Python's sorted() is stable). This is
+    what the UI uses to label the topmost option as "(latest)".
+
+    Previously this function ranked stable > beta > alpha/test which
+    produced wrong labels when a maintainer published a test build
+    AFTER the last stable (e.g. shadowmountplus 1.6test11 published
+    later than 1.6beta10 — the test build is the actual latest, not
+    the beta).
+    """
+    def _key(v: dict) -> str:
+        return v.get("published_at") or ""
+    return sorted(versions, key=_key, reverse=True)
 
 
 def trim_versions(versions: list) -> list:
@@ -213,13 +232,101 @@ def build_backup() -> dict:
     }
 
 
+def build_backup_zip() -> bytes:
+    """Build a complete backup as a ZIP archive containing:
+
+      backup.json                — the same dict that build_backup() returns
+      payloads/<name>.elf / .lua — every binary in PAYLOAD_DIR
+
+    This is the user-facing format since custom-uploaded payloads
+    aren't downloadable from GitHub at restore time. The legacy
+    flat-JSON format is still accepted on import for back-compat.
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "backup.json",
+            json.dumps(build_backup(), ensure_ascii=False, indent=2),
+        )
+        if PAYLOAD_DIR.exists():
+            for f in PAYLOAD_DIR.iterdir():
+                if not f.is_file():
+                    continue
+                if f.suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+                    continue
+                # Skip the .bak files — they're rollback artefacts,
+                # not user data, and they bloat the archive.
+                if f.name.endswith(".bak"):
+                    continue
+                zf.write(f, arcname=f"payloads/{f.name}")
+    return buf.getvalue()
+
+
+def parse_backup_archive(raw: bytes) -> Tuple[dict, Dict[str, bytes]]:
+    """Parse an export blob and return ``(backup_dict, payloads_by_name)``.
+
+    Accepts either:
+      * a ZIP (new format) — extracts backup.json + payloads/*
+      * raw JSON bytes (legacy flat-file format) — payloads_by_name is empty
+
+    Raises ``ValueError`` if the input doesn't match either format.
+    """
+    if raw[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            names = set(zf.namelist())
+            if "backup.json" not in names:
+                raise ValueError("ZIP backup missing backup.json")
+            backup = json.loads(zf.read("backup.json").decode("utf-8"))
+            payloads: Dict[str, bytes] = {}
+            for n in names:
+                # Case-insensitive prefix: a hand-edited backup from a
+                # Windows tool can casefold "payloads/" to "Payloads/"
+                # without otherwise corrupting the archive.
+                if not n.lower().startswith("payloads/") or n.endswith("/"):
+                    continue
+                base = Path(n).name
+                if not base:
+                    continue
+                if Path(base).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+                    continue
+                payloads[base] = zf.read(n)
+            return backup, payloads
+    # Legacy JSON
+    try:
+        return json.loads(raw.decode("utf-8")), {}
+    except Exception as exc:
+        raise ValueError(f"Not a valid backup (neither ZIP nor JSON): {exc}")
+
+
+def restore_backup_payloads(payloads: Dict[str, bytes]) -> int:
+    """Write extracted payload binaries to PAYLOAD_DIR. Returns count
+    written. Existing files are overwritten so a restore is
+    idempotent against the archive contents."""
+    if not payloads:
+        return 0
+    PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for name, data in payloads.items():
+        safe = Path(name).name
+        if not safe or Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+            continue
+        atomic_write_bytes(PAYLOAD_DIR / safe, data)
+        count += 1
+    return count
+
+
 def restore_backup(data: dict) -> None:
-    """Restore all configuration from a backup dict (after auto-saving current)."""
-    # Auto-backup current config first
-    _auto_backup = CONFIG_BASE / "pre_restore_backup.json"
-    _auto_backup.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    """Restore all configuration from a backup dict (after auto-saving current).
+
+    For ZIP-form restores, callers should first call
+    :func:`restore_backup_payloads` with the extracted bytes.
+    """
+    # Auto-backup current config first — also as ZIP so payloads
+    # survive a rollback after a botched restore.
+    try:
+        (CONFIG_BASE / "pre_restore_backup.zip").write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Pre-restore auto-backup failed: %s", exc)
 
     if "state" in data:
         save_ui_state(data["state"])
@@ -234,7 +341,7 @@ def restore_backup(data: dict) -> None:
         for name, content in data["profiles"].items():
             safe = Path(name).name
             if safe.endswith(".txt"):
-                (PROFILES_DIR / safe).write_text(content, encoding="utf-8")
+                atomic_write_text(PROFILES_DIR / safe, content)
 
 
 _SETTINGS_KEYS = frozenset({
@@ -259,11 +366,13 @@ def restore_backup_selective(
     """
     import time as _time
 
-    # Auto-backup current config before touching anything
-    _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.json"
-    _auto.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    # Auto-backup current config before touching anything (ZIP form so
+    # payloads survive a rollback).
+    _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.zip"
+    try:
+        _auto.write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Selective pre-import auto-backup failed: %s", exc)
 
     imported: dict = {
         "sources": 0, "payloads": 0, "flows": 0, "profiles": 0, "settings": False,
@@ -355,7 +464,7 @@ def restore_backup_selective(
             target = PROFILES_DIR / safe
             if target.exists() and mode == "merge" and conflict == "skip":
                 continue
-            target.write_text(content, encoding="utf-8")
+            atomic_write_text(target, content)
             count += 1
             # Validate: flag profiles that reference payload files not on disk
             for line in content.splitlines():
@@ -379,11 +488,13 @@ def reset_config() -> dict:
     """Factory reset: back up then wipe all user data."""
     import time as _time
 
-    # Backup first
-    backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.json"
-    backup_file.write_text(
-        json.dumps(build_backup(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    # Backup first — ZIP so payloads survive the wipe and a manual
+    # restore from this file actually puts them back.
+    backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.zip"
+    try:
+        backup_file.write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Pre-reset auto-backup failed: %s", exc)
 
     # Wipe payload files
     deleted_payloads = 0
@@ -403,7 +514,8 @@ def reset_config() -> dict:
 
     # Wipe config JSON files
     for cfg_f in (SOURCES_FILE, STATE_FILE, DEVICES_FILE,
-                  PAYLOAD_META_FILE, TIMING_FILE, FLOW_RUNS_FILE):
+                  PAYLOAD_META_FILE, TIMING_FILE, FLOW_RUNS_FILE,
+                  FLOW_HISTORY_FILE):
         if cfg_f.exists():
             cfg_f.unlink()
 
