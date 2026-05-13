@@ -8,8 +8,15 @@ async function exportConfig() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
+    // Prefer the filename the backend put in Content-Disposition
+    // (it contains the timestamp). Fall back to a sane default if
+    // the header isn't there for some reason.
+    let filename = 'ps5-autopayload-backup.zip';
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m  = cd.match(/filename="([^"]+)"/);
+    if (m) filename = m[1];
     const a    = Object.assign(document.createElement('a'), {
-      href: url, download: 'ps5-autopayload-backup.json',
+      href: url, download: filename,
     });
     document.body.appendChild(a);
     a.click();
@@ -42,20 +49,54 @@ async function resetConfig() {
 }
 
 // ── Selective Import ─────────────────────────────────────────────
+// _importData holds the inspected backup metadata + the raw upload
+// bytes so we can re-send them as-is on confirm. ZIP archives carry
+// payload binaries we don't try to parse in the browser; we just
+// surface the backup.json contents for the preview and forward the
+// blob to the backend which already knows how to deal with both.
 
-let _importData = null;
+let _importData = null;        // parsed backup.json (preview only)
+let _importRawBlob = null;     // the file as the user picked it
+let _importIsZip = false;
 
 function importConfig() {
   const input = Object.assign(document.createElement('input'), {
-    type: 'file', accept: '.json',
+    type: 'file', accept: '.zip,.json',
   });
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
+    const buf  = await file.arrayBuffer();
+    const head = new Uint8Array(buf, 0, 4);
+    _importIsZip = head[0] === 0x50 && head[1] === 0x4b
+                && head[2] === 0x03 && head[3] === 0x04;
+    _importRawBlob = new Blob([buf], {
+      type: _importIsZip ? 'application/zip' : 'application/json',
+    });
     let data;
-    try { data = JSON.parse(await file.text()); }
-    catch { showToast('Invalid JSON file'); return; }
-    if (data.version !== 1) { showToast('Unrecognised backup format'); return; }
+    if (_importIsZip) {
+      // ZIP: ask the backend to extract just backup.json for the
+      // preview. Cheap and avoids pulling in a JS ZIP lib.
+      try {
+        const res = await fetch(BASE + '/api/backup/inspect', {
+          method: 'POST', body: _importRawBlob,
+          headers: { 'Content-Type': 'application/zip' },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const info = await res.json();
+        data = info.backup;
+      } catch (e) {
+        showToast('Could not read ZIP: ' + e.message);
+        return;
+      }
+    } else {
+      try { data = JSON.parse(new TextDecoder().decode(buf)); }
+      catch { showToast('Invalid JSON file'); return; }
+    }
+    if (!data || data.version !== 1) {
+      showToast('Unrecognised backup format');
+      return;
+    }
     _importData = data;
     _openImportModal(data);
   };
@@ -91,6 +132,8 @@ function _openImportModal(data) {
 function _closeImportModal() {
   document.getElementById('import-modal').style.display = 'none';
   _importData = null;
+  _importRawBlob = null;
+  _importIsZip = false;
 }
 
 // ── Dependency validation ─────────────────────────────────────────
@@ -159,16 +202,35 @@ async function _confirmImport() {
   btn.textContent = 'Importing…';
 
   try {
-    const result = await api('/api/backup/restore-selective', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        backup:   _importData,
-        sections,
+    let result;
+    if (_importIsZip && _importRawBlob) {
+      // ZIP: forward the raw archive and pass the user's choices
+      // via query params (avoids stuffing binary data into a JSON
+      // wrapper). Backend extracts backup.json + the payload binaries.
+      const qs = new URLSearchParams({
+        sections: sections.join(','),
         mode,
         conflict: 'replace',
-      }),
-    });
+        include_payload_files: sections.includes('payloads') ? '1' : '0',
+      });
+      const res = await fetch(BASE + `/api/backup/restore-selective?${qs}`, {
+        method: 'POST', body: _importRawBlob,
+        headers: { 'Content-Type': 'application/zip' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
+      result = await res.json();
+    } else {
+      result = await api('/api/backup/restore-selective', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          backup:   _importData,
+          sections,
+          mode,
+          conflict: 'replace',
+        }),
+      });
+    }
 
     _closeImportModal();
 
