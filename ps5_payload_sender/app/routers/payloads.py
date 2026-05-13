@@ -83,12 +83,26 @@ async def api_import_payload(req: ImportPayloadRequest):
     existing = meta.get(safe, {})
     existing_versions = existing.get("versions", [])
     new_versions = req.all_versions or [{"tag": req.version, "download_url": req.download_url}]
+    # Index existing entries by tag so we can preserve fields (notably
+    # `published_at`) that the new caller may not have. Folder-mode
+    # re-imports send `published_at=""` for every version — without
+    # this merge the date ranking would silently regress to a legacy
+    # state every time the user clicks Re-scan.
+    existing_by_tag = {v["tag"]: v for v in existing_versions if v.get("tag")}
     seen_tags: set = set()
     merged: list = []
     for v in (new_versions + existing_versions):
-        if v["tag"] not in seen_tags:
-            merged.append(v)
-            seen_tags.add(v["tag"])
+        tag = v.get("tag")
+        if not tag or tag in seen_tags:
+            continue
+        old = existing_by_tag.get(tag, {})
+        # Keep the new download_url etc., but never let an empty string
+        # overwrite a known-good `published_at`.
+        kept = dict(v)
+        if not kept.get("published_at") and old.get("published_at"):
+            kept["published_at"] = old["published_at"]
+        merged.append(kept)
+        seen_tags.add(tag)
     sources = load_sources()
     src_entry = next((s for s in sources if s["repo"] == req.repo), {})
     display_name = src_entry.get("display_name", "")

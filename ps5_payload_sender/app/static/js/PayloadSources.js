@@ -563,6 +563,13 @@ async function checkSourceUpdates(repo, sourceEl) {
     const usedAsUpdate   = new Set();
 
     if (!state.updateResults) state.updateResults = {};
+    // Drop any stale entries for this repo so a payload that was
+    // updated via some other path (Update All, switch-version) doesn't
+    // linger as a phantom "update available" on the next per-source
+    // Check. Matches the folder-source branch above.
+    Object.keys(state.updateResults)
+      .filter(k => state.updateResults[k].repo === repo)
+      .forEach(k => delete state.updateResults[k]);
     let updatesAvail = 0;
     // Single-payload repo with a single-asset newest release: trust the newest
     // release as the successor for the one tracked payload, regardless of

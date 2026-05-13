@@ -186,7 +186,7 @@ def reload_integration() -> dict:
         return {"success": False, "error": str(exc)}
 
 
-# ── Notifications (P2JB monitor) ──────────────────────────────────
+# ── Notifications ──────────────────────────────────────────────────
 
 def _call_ha_service(domain: str, service: str, data: dict, timeout: float = 5.0) -> bool:
     """POST /core/api/services/{domain}/{service}. Returns True on HTTP 2xx."""

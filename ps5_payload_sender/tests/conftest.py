@@ -26,12 +26,3 @@ def tmp_timing_file(tmp_path, monkeypatch):
     return f
 
 
-@pytest.fixture
-def tmp_flow_runs_file(tmp_path, monkeypatch):
-    """Redirect flow_analysis' storage file to a fresh tmp file."""
-    import flow_analysis
-    f = tmp_path / "flow_runs.json"
-    monkeypatch.setattr(flow_analysis, "FLOW_RUNS_FILE", f)
-    return f
-
-

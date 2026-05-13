@@ -279,7 +279,10 @@ def parse_backup_archive(raw: bytes) -> Tuple[dict, Dict[str, bytes]]:
             backup = json.loads(zf.read("backup.json").decode("utf-8"))
             payloads: Dict[str, bytes] = {}
             for n in names:
-                if not n.startswith("payloads/") or n.endswith("/"):
+                # Case-insensitive prefix: a hand-edited backup from a
+                # Windows tool can casefold "payloads/" to "Payloads/"
+                # without otherwise corrupting the archive.
+                if not n.lower().startswith("payloads/") or n.endswith("/"):
                     continue
                 base = Path(n).name
                 if not base:
