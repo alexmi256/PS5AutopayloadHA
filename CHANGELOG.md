@@ -2,62 +2,43 @@
 
 ## [Unreleased]
 
-### UI Refresh
+## [1.1.2] – 2026-05-13
 
-- **Roboto + Lucide SVG icons** (follow-up to the visual refresh):
-  - Replaced **Inter** with **Roboto Variable** (`static/fonts/Roboto.woff2`, ~43 KB latin subset). Same font Home Assistant itself ships, so the add-on now blends into the HA shell instead of standing out with its own typeface.
-  - Replaced every emoji/unicode-glyph icon (`☀`, `⬇`, `⬆`, `↺`, `⚙`, `＋`, `↻`, `▶`, `✕`, `🗑`, `🔍`, `⚠`, `💾`, `■`, `🌙`, `📌`) with **inline Lucide SVG icons** (MIT, monochrome, stroke-based). On macOS / iOS Safari the emoji icons were rendering as full-colour Apple Emoji glyphs, which clashed with the minimal aesthetic. New rendering is consistent on every browser and inherits text colour via `currentColor`.
-  - Touched: `index.html` (24 inline SVGs in static buttons / collapse arrows), `state.js`, `ConnectionPanel.js`, `PayloadList.js`, `PayloadSources.js`, `AutoLoadBuilder.js`, `ProfileManager.js`, `FavoritesBar.js`, `PortTiming.js` (27 SVGs emitted from render code via the new `icon()` helper).
-  - The `⭐ Favorites` filter tab / option labels / toast text — where `<option>` can't host an SVG — switched from emoji `⭐` (U+2B50, colour-emoji) to text-style `★` (U+2605, monochrome) so the favourites indicator renders the same everywhere.
-  - **`.collapse-arrow` rotation flipped**: closed state now `rotate(-90deg)` (chevron points right), `.open` is `rotate(0deg)` (chevron points down). The old `▶` glyph used the inverse — chevron-down replaces it without changing the existing collapse JS.
+### P2JB-Compatible Flow Notifications
 
-- **Visual refresh of the existing UI** — same layout, same controls, just better dressed:
-  - **Self-hosted Inter (variable, ~352 KB) + JetBrains Mono Regular/Medium (~185 KB)** under `static/fonts/`. Loaded with `font-display:swap` so the system stack is used until the .woff2 lands. Total ~540 KB, paid once and cached.
-  - **Design tokens overhaul**: slightly desaturated primary (`#4a6cf7` → `#5b7cfa` dark / `#4263eb` light), calmer borders, separate `--bg-soft` / `--card-hi` / `--border-hi` / `--warn-soft` / `--pri-soft` etc. for tinted surfaces. Radius dropped one notch (`.75rem` → `10px`, `.5rem` → `6px`).
-  - **Typography**: Inter for body, JetBrains Mono for every technical string (filenames, port numbers, version tags, IP addresses, asset paths, source repo slugs, search input for payloads, autoload editor textarea, status log). Forced via a CSS-only selector list so no JS render function needed touching.
-  - **Card titles** are no longer uppercase mini-labels — they're now readable 0.95 rem 600-weight headings.
-  - **Buttons** slightly slimmer (padding `.48rem .8rem`), unified hover (subtle bg + border-hi), `.btn-danger` quieter at rest (border only, soft red tint on hover instead of a solid red fill).
-  - **Filter tabs** turned into a segmented pill control (one shared track with a moving inset highlight) instead of separate outlined chips.
-  - **Quick-start tiles** softened to a `--pri-soft` pill with no border at rest; the full-primary fill only appears on hover.
-  - **Source-has-updates** rows now have a warn-tinted background (in addition to the existing 3 px amber left bar), and the badge moved from a solid amber chip to a soft amber-tinted text label.
-  - **Source update drawer**: fixed a dead `var(--panel)` reference that left the inline update rows transparent in the dev build.
-  - **`@font-face` ranges**: Inter variable covers 100–900 weight in a single file, JetBrains Mono ships at Regular + Medium.
-- **Bump dev build to 1.1.1-11-dev** so HA picks up the new static assets (cache-busted via the existing `?v=APP_VERSION` query).
+Flows can now automatically wait for the PS5 loader to become ready before sending payloads — no more sitting at the console watching the screen:
 
-### Internal
+- Supports **ELF Loader** (port 9021) and **Remote Lua Loader** (port 9026)
+- Home Assistant notifications are sent when the loader is ready, the flow completes, or a timeout/failure occurs
+- Notification settings (service, custom messages, timeout) are saved per flow and work with any `notify.*` service
 
-- **Crash-safe writes for every persistent config file**: every `Path.write_text(...)` / `write_bytes(...)` call on user-critical files (`sources.json`, `devices.json`, `state.json`, `payload_meta.json`, `flow_runs.json`, `port_timing.json`, `pre_restore_backup.json`, the imported/exported backup JSONs, every profile `.txt` and every imported payload `.elf` / `.lua`) now goes through a small `atomic_write` helper that writes to a sibling `.tmp` file first and then `os.replace`-es it onto the target. Previously, an OOM-kill or SD-card power loss mid-write left a truncated/half-written file and the user lost their entire add-on configuration. With the atomic pattern, a reader will always see either the previous valid file or the new valid file, never a partial one. New: `app/atomic_write.py` + `tests/test_atomic_write.py`.
+### Simplified Architecture
 
-### Bug Fixes (continued)
-
-- **Multi-update apply silently left the panel in a stale state**: same stale-DOM pattern — the apply button's click handler ran `renderSourcesList()` after switching versions, which detached the panel/updList/applyBtn the handler was still operating on. The remaining `refreshApplyBtn()` and `applyBtn.style.display = 'none'` calls became no-ops, so the panel disappeared abruptly. The panel is now re-rendered with the remaining updates so the post-update status stays visible.
-- **Per-source "↻ Check" panel never appeared in 1.1.1-dev**: clicking ↻ Check showed only a toast — the result panel that 1.1.1 opens below the source stayed hidden. Cause: the new highlight-affected-sources feature added a `renderSourcesList()` call inside `checkSourceUpdates`, which rebuilds every `.source-item` from scratch. The `panel` reference captured before that call was then a detached DOM node, so populating it and setting `display=''` had no visible effect. The panel is now re-queried after `renderSourcesList()` runs (in both the success and error paths) before being shown.
-- **Per-source "↻ Check" silently did nothing on failed requests**: when `/api/sources/releases` returned an error (e.g. 502 because a repo has no releases or because GitHub rate-limited the request), the frontend swallowed the exception and left the panel hidden — users got no visible feedback at all. The panel is now opened with the error message so the cause is visible.
-- **Global "Check Updates" silently dropped broken repos**: `/api/sources/check-updates` wrapped every per-repo GitHub call in `except Exception: pass`. If one repo rate-limited or 404'd, it disappeared from the result without any signal to the user, who saw "N checked" with no way to tell which were really checked. The endpoint now collects per-repo errors and returns them under `errors[]`; the frontend logs each failed repo and shows a toast summarising how many failed.
-
-### Internal
-
-- **`download_payload` host whitelist**: every URL the add-on hands to `urllib.urlopen` originates from a GitHub API response (release `browser_download_url`, raw.githubusercontent.com paths). Tightening the download path to a fixed set of GitHub hosts (`github.com`, `api.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`, `codeload.github.com`) is essentially free and blocks SSRF if payload metadata is ever tampered with.
-- **`scan_repo_files` tree cache size cap**: the in-memory cache now evicts the oldest entry when it exceeds 100 repos, so long-running add-on instances cannot accumulate unbounded memory for users who add many repositories.
-- **Parallel WebSocket broadcast**: `ConnectionManager.broadcast` now fans out via `asyncio.gather` instead of awaiting each client sequentially. A single slow dashboard tab no longer holds up status updates for the others.
-- **Cleaner GitHub error handling in `/api/sources`**: three near-identical try/except blocks around `gh_get_releases` / `gh_scan_repo_files` consolidated into a single `_run_gh` helper. Behaviour is unchanged except that `/api/sources/tree` now returns HTTP 502 instead of pass-through GitHub status codes for non-404 HTTP errors (e.g. 403 rate-limit), which is consistent with the other `/api/sources/*` endpoints.
-- **`payload_sender`: waited-close on errored connections**: the `OSError`/`BrokenPipeError` path called `writer.close()` without `await writer.wait_closed()`, leaving the close handshake potentially incomplete. Added the wait (mirroring the success path).
-- **Replaced deprecated stdlib calls**: `datetime.utcnow()` (deprecated in 3.12, removal in 3.14) replaced with `datetime.now(timezone.utc)` in the timing-analyze ISO timestamps and the log-export filename stamp. `asyncio.get_event_loop()` calls in `/api/flow/analyze` replaced with the running loop captured once at the top of the handler (the rest of the module already used `get_running_loop`). No observable behaviour change — only future-proofing for newer Python.
-- **Global "Check Updates" still missed single-payload repos with versioned filenames** when the old asset name was still present in the 3 most recent releases (e.g. ShadowMountPlus where `1.6test8-fix1` was still in the recent-3 window alongside `1.6beta10`). The asset-name match found the old release, compared the tag to current, decided "no update" — even though a newer release tag existed. Both global and per-source checks now follow the same rule for single-payload repos: trust the newest release as the successor regardless of filename match.
+- Removed the separate **WAIT FOR LOADER** builder step — port waiting is now built into the flow runner itself
+- Removed the **Create P2JB Flow** helper — flows are created directly in the builder with the same result
 
 ### UI Improvements
 
-- **Static assets are now cache-busted on every add-on update**: HA OS / mobile browsers aggressively cached `PayloadSources.js` and the other JS/CSS files, so frontend changes were invisible until the user manually hard-reloaded — easy to overlook on iPhone Safari. The `/` endpoint now appends `?v=APP_VERSION` to every `static/js/*.js` and `static/css/*.css` URL and serves the HTML with `Cache-Control: no-cache`. Browsers re-fetch JS/CSS automatically after every version bump.
-- **Multi-select for pending updates** (both per-source panel and global "⬆ Update All"):
-  - Per-source panel: each update gets a checkbox, "Update Selected (N)" button at the bottom. "Select All" / "Deselect All" appears when more than one update is pending.
-  - Global Update All: opens a modal grouped by repo with checkboxes, all selected by default. Pick which payloads actually receive the new version.
-  - The existing single-payload-per-row import/version picker is unchanged — multi-select for new payload imports (Add Source / Check) and per-payload version dropdown still work exactly the same way.
-- **Sources with available updates are now visually highlighted**: orange left-border on the source card and a `⚠ N updates` badge next to the source name. The per-source "↻ Check" panel now stays open after a check and lists each pending update with an inline "Update" button — previously the only signal was a transient toast.
+- Inline SVG icons (Lucide) replace emoji/unicode glyphs — consistent rendering on all browsers and operating systems, including Safari on macOS and iOS
+- Switched to **Roboto** — the same font Home Assistant uses — so the add-on UI blends naturally into the HA shell
+- Multi-select for pending payload updates: choose which payloads to update instead of applying all at once (both per-source panel and global Update All)
+- Source cards now show a highlighted background and an update badge when updates are available
+- Cleaner notification configuration panel in the flow builder
+
+### Reliability
+
+- All config files now use atomic writes — a power loss or OOM-kill during a save can no longer produce a corrupted or truncated file; you will always see either the previous valid state or the new one
+- Static assets (JS/CSS) are cache-busted on every update — browsers automatically fetch the latest version without a manual hard-reload
 
 ### Bug Fixes
 
-- **Update check missed repos with versioned asset names** (e.g. drakmor/ShadowMountPlus where the release asset is `ShadowMountPlus_1.6test8-fix1.zip`): both `/api/sources/check-updates` and the per-source "↻ Check" button matched releases by asset filename. When the filename embedded the version, every release had a different asset name, so the saved name never matched the newest release and no update was reported. Fallback added: when a repo has a single tracked payload and the newest release contains a single asset, that asset is treated as the successor regardless of filename. New asset names in the result use the updated filename so the follow-up switch-version call works.
-- **"Check Updates" inconsistent with per-source "Check"**: the global update check ignored a newer GitHub release if its tag already existed in the local `versions[]` history (e.g. after rolling back to an older version), while the per-source Check button still reported the update. Both checks now use the same rule — an update is reported whenever the active version is not the latest GitHub release.
+- Update check no longer misses repos whose release assets have versioned filenames (e.g. `ShadowMountPlus_1.6test8-fix1.zip`)
+- Global "Check Updates" and per-source "Check" now use the same detection rule — no more inconsistent results between the two
+- Multi-update apply no longer leaves the panel in a stale state after updating
+- Per-source "↻ Check" panel now opens correctly and shows the error message on failure instead of silently doing nothing
+- Sources unavailable during update checks (rate-limited, no releases, network error) now report an error instead of silently disappearing from the result
+
+---
 
 ## [1.1.1] – 2026-04-19
 
