@@ -234,12 +234,26 @@ def _is_zip(data: bytes) -> bool:
 
 def _extract_from_zip(data: bytes, prefer_name: Optional[str]) -> Tuple[bytes, str]:
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        names = zf.namelist()
         candidates = [
-            n for n in zf.namelist()
+            n for n in names
             if Path(n).suffix.lower() in _PAYLOAD_EXTENSIONS
         ]
         if not candidates:
-            raise ValueError("No valid payload (.elf/.lua) found in archive")
+            # Surface what IS in the archive so the user can tell whether
+            # the release shipped source code, a different artefact, or
+            # the wrong file. Backend's HTTPException(502, …) bubbles
+            # this string up to the UI's failed-row error chip.
+            preview = ", ".join(names[:8])
+            if len(names) > 8:
+                preview += f", … (+{len(names) - 8} more)"
+            raise ValueError(
+                f"No .elf or .lua found in archive. "
+                f"Archive contains: {preview}. "
+                f"This release probably ships source code instead of a "
+                f"drop-in payload — re-add the source pointing at a "
+                f"specific file URL, or skip this update."
+            )
         target = next(
             (n for n in candidates if Path(n).name == prefer_name),
             candidates[0],
