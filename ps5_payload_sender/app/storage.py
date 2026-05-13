@@ -6,12 +6,14 @@ Persistent storage helpers:
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
+import zipfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from atomic_write import atomic_write_text
+from atomic_write import atomic_write_bytes, atomic_write_text
 from config import (
     ALLOWED_PAYLOAD_EXTENSIONS,
     CONFIG_BASE,
@@ -230,11 +232,98 @@ def build_backup() -> dict:
     }
 
 
+def build_backup_zip() -> bytes:
+    """Build a complete backup as a ZIP archive containing:
+
+      backup.json                — the same dict that build_backup() returns
+      payloads/<name>.elf / .lua — every binary in PAYLOAD_DIR
+
+    This is the user-facing format since custom-uploaded payloads
+    aren't downloadable from GitHub at restore time. The legacy
+    flat-JSON format is still accepted on import for back-compat.
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "backup.json",
+            json.dumps(build_backup(), ensure_ascii=False, indent=2),
+        )
+        if PAYLOAD_DIR.exists():
+            for f in PAYLOAD_DIR.iterdir():
+                if not f.is_file():
+                    continue
+                if f.suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+                    continue
+                # Skip the .bak files — they're rollback artefacts,
+                # not user data, and they bloat the archive.
+                if f.name.endswith(".bak"):
+                    continue
+                zf.write(f, arcname=f"payloads/{f.name}")
+    return buf.getvalue()
+
+
+def parse_backup_archive(raw: bytes) -> Tuple[dict, Dict[str, bytes]]:
+    """Parse an export blob and return ``(backup_dict, payloads_by_name)``.
+
+    Accepts either:
+      * a ZIP (new format) — extracts backup.json + payloads/*
+      * raw JSON bytes (legacy flat-file format) — payloads_by_name is empty
+
+    Raises ``ValueError`` if the input doesn't match either format.
+    """
+    if raw[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            names = set(zf.namelist())
+            if "backup.json" not in names:
+                raise ValueError("ZIP backup missing backup.json")
+            backup = json.loads(zf.read("backup.json").decode("utf-8"))
+            payloads: Dict[str, bytes] = {}
+            for n in names:
+                if not n.startswith("payloads/") or n.endswith("/"):
+                    continue
+                base = Path(n).name
+                if not base:
+                    continue
+                if Path(base).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+                    continue
+                payloads[base] = zf.read(n)
+            return backup, payloads
+    # Legacy JSON
+    try:
+        return json.loads(raw.decode("utf-8")), {}
+    except Exception as exc:
+        raise ValueError(f"Not a valid backup (neither ZIP nor JSON): {exc}")
+
+
+def restore_backup_payloads(payloads: Dict[str, bytes]) -> int:
+    """Write extracted payload binaries to PAYLOAD_DIR. Returns count
+    written. Existing files are overwritten so a restore is
+    idempotent against the archive contents."""
+    if not payloads:
+        return 0
+    PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for name, data in payloads.items():
+        safe = Path(name).name
+        if not safe or Path(safe).suffix.lower() not in ALLOWED_PAYLOAD_EXTENSIONS:
+            continue
+        atomic_write_bytes(PAYLOAD_DIR / safe, data)
+        count += 1
+    return count
+
+
 def restore_backup(data: dict) -> None:
-    """Restore all configuration from a backup dict (after auto-saving current)."""
-    # Auto-backup current config first
-    _auto_backup = CONFIG_BASE / "pre_restore_backup.json"
-    atomic_write_text(_auto_backup, json.dumps(build_backup(), ensure_ascii=False, indent=2))
+    """Restore all configuration from a backup dict (after auto-saving current).
+
+    For ZIP-form restores, callers should first call
+    :func:`restore_backup_payloads` with the extracted bytes.
+    """
+    # Auto-backup current config first — also as ZIP so payloads
+    # survive a rollback after a botched restore.
+    try:
+        (CONFIG_BASE / "pre_restore_backup.zip").write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Pre-restore auto-backup failed: %s", exc)
 
     if "state" in data:
         save_ui_state(data["state"])
@@ -274,9 +363,13 @@ def restore_backup_selective(
     """
     import time as _time
 
-    # Auto-backup current config before touching anything
-    _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.json"
-    atomic_write_text(_auto, json.dumps(build_backup(), ensure_ascii=False, indent=2))
+    # Auto-backup current config before touching anything (ZIP form so
+    # payloads survive a rollback).
+    _auto = CONFIG_BASE / f"pre_import_backup_{int(_time.time())}.zip"
+    try:
+        _auto.write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Selective pre-import auto-backup failed: %s", exc)
 
     imported: dict = {
         "sources": 0, "payloads": 0, "flows": 0, "profiles": 0, "settings": False,
@@ -392,9 +485,13 @@ def reset_config() -> dict:
     """Factory reset: back up then wipe all user data."""
     import time as _time
 
-    # Backup first
-    backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.json"
-    atomic_write_text(backup_file, json.dumps(build_backup(), ensure_ascii=False, indent=2))
+    # Backup first — ZIP so payloads survive the wipe and a manual
+    # restore from this file actually puts them back.
+    backup_file = CONFIG_BASE / f"backup_pre_reset_{int(_time.time())}.zip"
+    try:
+        backup_file.write_bytes(build_backup_zip())
+    except Exception as exc:
+        _log.warning("Pre-reset auto-backup failed: %s", exc)
 
     # Wipe payload files
     deleted_payloads = 0
