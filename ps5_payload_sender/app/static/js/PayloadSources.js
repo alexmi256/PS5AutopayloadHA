@@ -311,10 +311,21 @@ async function addSource() {
     _renderDetectedPayloads(data.repo, data.assets);
     if (linked.length) await refreshPayloads();
     await refreshSources();
-    _editingSourceRepo = null;
-    repoInput.value   = '';
-    filterInput.value = '';
-    document.getElementById('source-display-input').value = '';
+    // In Add mode: clear the form so the user can immediately type
+    // a new repo. In Edit/Re-scan mode: keep the panel populated so
+    // the user can still see the path and tweak the filter / display
+    // name afterwards. _editingSourceRepo stays set so the next Save
+    // updates the right entry.
+    if (!_editingSourceRepo) {
+      repoInput.value   = '';
+      filterInput.value = '';
+      document.getElementById('source-display-input').value = '';
+    } else {
+      // If the user changed the repo in the input before re-scanning,
+      // update the tracked id so a subsequent Save targets the new
+      // entry (saveSourceConfig deletes the old one if it differs).
+      _editingSourceRepo = data.repo;
+    }
   } catch (e) {
     const txt = e.message.includes('404')
       ? 'No .elf/.lua payload files found. ZIP-only releases are not supported.'
