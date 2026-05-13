@@ -89,6 +89,8 @@ async def api_add_source(req: SourceAddRequest):
         entry: dict = {"tag": a["tag"], "download_url": a["download_url"]}
         if a.get("path"):
             entry["path"] = a["path"]
+        if a.get("sha"):
+            entry["sha"] = a["sha"]
         if not any(v["tag"] == entry["tag"] for v in asset_versions[aname]):
             asset_versions[aname].append(entry)
 
@@ -101,6 +103,11 @@ async def api_add_source(req: SourceAddRequest):
                 "version": versions[0]["tag"], "versions": versions,
                 "display_name": req.display_name.strip(),
             }
+            # Persist the git blob SHA for repo_file sources so the
+            # check-updates endpoint can detect content changes without
+            # a release/tag bump (folder-mode update detection).
+            if versions[0].get("sha"):
+                meta[aname]["sha"] = versions[0]["sha"]
             auto_linked.append(aname)
     if auto_linked:
         save_payload_meta(meta)
@@ -163,6 +170,15 @@ async def api_check_updates():
     meta = load_payload_meta()
     if not meta:
         return {"updates": [], "checked": 0}
+    # Index sources by slug so we can look up source_type / folder for
+    # each repo. A source set to source_type="folder" has explicitly
+    # opted out of release-based update detection — its files come
+    # straight from the repo tree (a click on "Re-scan" picks up new
+    # commits). Reporting release tags for such a source produces
+    # false-positive updates (e.g. `poops_ps5.lua: latest → 2.2d`
+    # when 2.2d is a release ZIP, not a folder file).
+    sources_by_slug = {s["repo"]: s for s in load_sources()}
+
     repos: dict = {}
     for fname, m in meta.items():
         repo = m.get("repo", "")
@@ -171,12 +187,62 @@ async def api_check_updates():
     updates: list = []
     errors:  list = []
     loop = asyncio.get_running_loop()
+    meta_dirty = False        # set by folder-mode SHA backfill below
     for slug, filenames in repos.items():
+        src_cfg = sources_by_slug.get(slug, {})
         parts = slug.split("/")
         if len(parts) != 2:
             errors.append({"repo": slug, "error": "Invalid repository format"})
             continue
         owner, repo_name = parts
+
+        # Folder-typed sources opt out of release-based detection.
+        # Instead, compare the git blob SHA of each owned file against
+        # the SHA returned by scan_repo_files (Trees API). If the SHA
+        # differs the upstream file was modified — that's an update.
+        # First time a file is seen without a stored SHA we silently
+        # backfill the current SHA as baseline so the user doesn't
+        # get a spurious "update" on the very first check.
+        if src_cfg.get("source_type") == "folder":
+            folder = src_cfg.get("folder") or None
+            try:
+                tree_files = await loop.run_in_executor(
+                    executor, gh_scan_repo_files, owner, repo_name, folder,
+                )
+            except urllib.error.HTTPError as exc:
+                errors.append({"repo": slug, "error": f"HTTP {exc.code}"})
+                continue
+            except Exception as exc:
+                errors.append({"repo": slug, "error": str(exc)})
+                continue
+            by_name = {f["asset_name"]: f for f in tree_files}
+            for fname in filenames:
+                tree_entry = by_name.get(fname)
+                if not tree_entry:
+                    continue
+                tree_sha = tree_entry.get("sha", "")
+                if not tree_sha:
+                    continue
+                current_sha = meta.get(fname, {}).get("sha", "")
+                if not current_sha:
+                    # Backfill baseline; no update reported this round.
+                    meta[fname]["sha"] = tree_sha
+                    meta_dirty = True
+                    continue
+                if current_sha != tree_sha:
+                    updates.append({
+                        "filename":        fname,
+                        # Short SHAs read like a version for the UI:
+                        # `latest a1b2c3d → e4f5g6h`
+                        "current_version": current_sha[:7],
+                        "latest_version":  tree_sha[:7],
+                        "download_url":    tree_entry["download_url"],
+                        "repo":            slug,
+                        "asset_name":      tree_entry["asset_name"],
+                        "sha":             tree_sha,
+                    })
+            continue   # done with this repo — don't fall through to releases
+
         try:
             assets = await loop.run_in_executor(executor, gh_get_releases, owner, repo_name)
         except urllib.error.HTTPError as exc:
@@ -219,4 +285,7 @@ async def api_check_updates():
                     "repo": slug,
                     "asset_name": latest["asset_name"],
                 })
+    # Persist any silent SHA backfills from the folder-mode branch above
+    if meta_dirty:
+        save_payload_meta(meta)
     return {"updates": updates, "checked": len(repos), "errors": errors}

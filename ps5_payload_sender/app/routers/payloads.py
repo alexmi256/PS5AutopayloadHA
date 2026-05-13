@@ -133,6 +133,11 @@ async def api_switch_version(filename: str, req: SwitchVersionRequest):
         "version": req.version, "backup_version": backup_version,
         "versions": trim_versions(existing_versions),
     }
+    # Folder-mode update: persist the new blob SHA so subsequent
+    # check-updates compares against it (otherwise we'd see the
+    # "old" SHA forever and report a phantom update on every check).
+    if req.sha:
+        meta[safe]["sha"] = req.sha
     save_payload_meta(meta)
     await manager.status(f"'{safe}' switched to {req.version}", level="success")
     return {"success": True, "filename": safe, "version": req.version, "backup_version": backup_version}
