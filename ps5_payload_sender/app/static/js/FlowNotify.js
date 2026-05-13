@@ -34,6 +34,7 @@ async function initFlowNotify() {
   svc.addEventListener('input', () => {
     _flowValidateService();
     _flowUpdateLoaderUI();
+    _flowPersist();
   });
 
   // Loader-config visibility + warning are driven by the loader_ready toggle
@@ -44,6 +45,21 @@ async function initFlowNotify() {
   });
   _flowUpdateLoaderUI();
 
+  // Persist every flow-notify input change so the config survives
+  // browser reloads (state.persistState reads via flowNotifyReadConfig).
+  // Hooks up all checkboxes + numeric fields + the persistent toggle —
+  // the service field already calls _flowPersist via its handler above.
+  [
+    'flow-wait-for-loader', 'flow-notify-ready', 'flow-notify-started',
+    'flow-notify-completed', 'flow-notify-failed', 'flow-notify-persistent',
+    'flow-loader-port', 'flow-loader-interval', 'flow-loader-timeout',
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', _flowPersist);
+    el.addEventListener('input',  _flowPersist);
+  });
+
   // Test buttons
   document.querySelectorAll('[data-flow-test]').forEach(btn => {
     btn.addEventListener('click', () => _flowTestNotification(btn.dataset.flowTest));
@@ -52,6 +68,13 @@ async function initFlowNotify() {
     .addEventListener('click', _flowSimulateLoaderReady);
   document.getElementById('flow-test-realflow')
     .addEventListener('change', _flowToggleRealFlowWarn);
+}
+
+// Debounced persist of the in-progress flow-notify config via the
+// shared scheduleSave() pipeline. Lets the user's settings survive
+// a browser reload even before they Save the flow as a profile.
+function _flowPersist() {
+  if (typeof scheduleSave === 'function') scheduleSave();
 }
 
 // ─── Notify config read/apply (used by AutoLoadBuilder) ──────────

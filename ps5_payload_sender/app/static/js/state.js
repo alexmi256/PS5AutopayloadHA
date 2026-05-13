@@ -141,6 +141,10 @@ async function persistState() {
         payload_filter:       state.payloadFilter,
         builder_steps:        builder.steps,
         builder_profile_name: document.getElementById('builder-profile-name').value,
+        // Flow Notifications config — keep the user's in-progress
+        // settings across reloads, just like builder_steps.
+        flow_notify_config:   typeof flowNotifyReadConfig === 'function'
+                                ? flowNotifyReadConfig() : null,
       }),
     });
   } catch (_) { /* silent */ }
@@ -168,6 +172,8 @@ async function loadPersistedState() {
     }
     if (saved.builder_profile_name)
       document.getElementById('builder-profile-name').value = saved.builder_profile_name;
+    if (saved.flow_notify_config && typeof flowNotifyApplyConfig === 'function')
+      flowNotifyApplyConfig(saved.flow_notify_config);
   } catch (_) { /* first run */ }
 }
 
