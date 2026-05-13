@@ -366,7 +366,13 @@ function _renderDetectedPayloads(repo, assets) {
     row.dataset.assetSize      = String(latest.size       || 0);
     row.dataset.releaseId      = String(latest.release_id || 0);
     row.dataset.allVersions    = JSON.stringify(
-      versions.map(v => ({ tag: v.tag, download_url: v.download_url, path: v.path || '' }))
+      // Include published_at so the backend can rank "latest" by date
+      // instead of guessing from the tag (test/beta/stable heuristic
+      // produced wrong "(latest)" labels — see PR fix).
+      versions.map(v => ({
+        tag: v.tag, download_url: v.download_url,
+        path: v.path || '', published_at: v.published_at || '',
+      }))
     );
 
     const cb = document.createElement('input');
