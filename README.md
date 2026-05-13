@@ -41,48 +41,49 @@ No manual timing. No repeated sending. No trial and error.
 2. Home Assistant detects that the PS5 is active  
    (e.g. via smart plug power usage)
 
-3. The system monitors specific ports on the PS5
+3. The add-on runs your configured flow automatically
 
 ---
 
 ## Port Logic (Core System)
 
-- **Port 9026**  
-  → Lua Core / Userland Loader is ready  
-
-- **Port 9021**  
-  → ELF Loader (elfldr) is ready to receive payloads  
+- **Port 9026** → Remote Lua Loader is ready
+- **Port 9021** → ELF Loader (elfldr) is ready to receive payloads
 
 ---
 
 ## Automated Flow
 
-- Exploit is started (BD-J / Luac0re / Game)
-- Home Assistant detects PS5 activity
-- Wait for **Port 9026**
-- Send **Lua payload**
-- Wait for **Port 9021**
-- Send **ELF payload**
-- Done
+A typical P2JB / Patience chain looks like this:
+
+1. Exploit is triggered (BD-J / Luac0re / Game)
+2. Home Assistant detects PS5 activity and starts the flow
+3. Flow waits for **Port 9026** (Lua Loader) — no timeout watching required
+4. Sends **Lua payload**
+5. Waits for **Port 9021** (ELF Loader)
+6. Sends **ELF payload**
+7. Home Assistant sends a notification — done
+
+You do not need to be in front of the PS5. The flow waits for each loader automatically and notifies you when it finishes.
 
 ---
 
-## What is ELF Loader (elfldr)?
+## Flow Notifications (P2JB Support)
 
-The ELF Loader:
+Flows can wait for the PS5 loader to become ready and notify you at each stage via Home Assistant.
 
-- runs on the PS5 after exploit stage
-- listens on **Port 9021**
-- receives payloads over the network
-- executes them on the system
+- **Loader ready** — notified as soon as the loader port opens
+- **Flow complete** — notified when the full chain finishes
+- **Timeout / failure** — notified if the loader does not respond in time
 
----
+Notifications work with any `notify.*` service (mobile app, persistent notification, etc.) and are configured per flow — settings are saved with the flow and persist across restarts.
 
-## Important
+Supported loaders:
 
-- This project is **NOT an exploit**
-- It does **NOT replace BD-J or Luac0re**
-- It only automates the payload execution AFTER the exploit
+| Loader | Port |
+|--------|------|
+| ELF Loader (elfldr) | 9021 |
+| Remote Lua Loader | 9026 |
 
 ---
 
@@ -91,20 +92,19 @@ The ELF Loader:
 - Upload `.elf`, `.bin` and `.lua` payloads (including ZIP archives)
 - Visual Auto-Load Builder — Send / Delay / Wait-for-Port steps
 - Drag-and-drop step reordering
+- Per-flow notifications — loader ready, flow complete, timeout/failure via any `notify.*` service
 - Export autoload.zip for USB-based delivery
 - GitHub Payload Sources — import directly from any public repo
-- Automatic update checks for all sources
+- Automatic update checks for all sources; multi-select update apply
 - Version history per payload (up to 5 versions, auto-pruned)
 - Favorites system for payloads and flows
 - Search & filtering (type, name, favorites)
-- Quick Start — pin profiles for instant one-tap execution
+- Quick Start — pin flows for instant one-tap execution
 - Device Manager — save and switch between multiple PS5 IPs
 - Config Backup / Restore / Reset with automatic pre-reset backup
 - Advanced Mode — toggleable developer tools (Port Checker, Execution Log)
-- Persistent configuration — no data loss on restarts or updates
-- Run / Stop / Pause / Resume execution
+- Crash-safe config writes — no data loss on power failure or OOM-kill
 - Real-time state via WebSocket
-- Multi-select bulk payload management
 - Clean UI optimized for Home Assistant (mobile + desktop)
 
 ---
@@ -119,7 +119,7 @@ Set your PS5 IP address and manage saved devices.
 ---
 
 ### Quick Start
-Pin your most-used profiles for instant one-tap execution.
+Pin your most-used flows for instant one-tap execution.
 
 ![Quick Start](docs/screenshots/quick-start.png)
 
@@ -133,16 +133,16 @@ Upload, search, filter and send `.lua` and `.elf` payloads directly to your PS5.
 ---
 
 ### Auto-Load Builder
-Build automated payload chains visually — with delays, port waits and reordering.
+Build automated payload chains visually — with delays, port waits, and per-flow notification settings.
 
 ![Auto-Load Builder](docs/screenshots/builder.png)
 
 ---
 
-### Saved Profiles
-Manage all your profiles — pin to Quick Start, edit, run or delete.
+### Saved Flows
+Manage all your flows — pin to Quick Start, edit, run or delete.
 
-![Saved Profiles](docs/screenshots/profiles.png)
+![Saved Flows](docs/screenshots/profiles.png)
 
 ---
 
@@ -179,13 +179,13 @@ No `configuration.yaml` changes needed.
 
 | Service | Parameters | Description |
 |---------|-----------|-------------|
-| `ps5_autopayload.run_profile` | `profile_name` (dropdown) | Run a saved profile |
+| `ps5_autopayload.run_profile` | `profile_name` (dropdown) | Run a saved flow |
 | `ps5_autopayload.stop` | — | Stop current execution |
 | `ps5_autopayload.pause` | — | Pause at current step |
 | `ps5_autopayload.resume` | — | Resume from pause |
-| `ps5_autopayload.reload_profiles` | — | Refresh profile dropdown in automations |
+| `ps5_autopayload.reload_profiles` | — | Refresh flow dropdown in automations |
 
-> The `profile_name` field shows a **live dropdown** of all your saved profiles in the HA automation editor.
+> The `profile_name` field shows a **live dropdown** of all your saved flows in the HA automation editor.
 
 ---
 
@@ -194,7 +194,7 @@ No `configuration.yaml` changes needed.
 | Entity | States | Description |
 |--------|--------|-------------|
 | `sensor.ps5_autopayload_status` | `idle` · `running` · `paused` · `stopped` · `completed` · `failed` | Current execution state |
-| `binary_sensor.ps5_autopayload_running` | `on` / `off` | `on` while a profile is active or paused |
+| `binary_sensor.ps5_autopayload_running` | `on` / `off` | `on` while a flow is active or paused |
 
 ---
 
@@ -253,13 +253,14 @@ lua_port: 9026             # Default port for Lua payloads
 elf_port: 9021             # Default port for ELF payloads
 port_check_timeout: 10     # Seconds to wait for a port before failing
 port_check_interval: 500   # Milliseconds between port check retries
+github_token: ""           # Optional — raises GitHub API rate limit to 5,000 req/hr
 ```
 
 ---
 
-## Auto-Load Profile Syntax
+## Auto-Load Flow Syntax
 
-Profiles are plain `.txt` files stored in `/config/ps5_autopayload/profiles/`.  
+Flows are plain `.txt` files stored in `/config/ps5_autopayload/profiles/`.  
 You can create them visually with the **Builder** or write them by hand:
 
 ```
@@ -289,10 +290,10 @@ goldhen.elf
 | Section | Description |
 |---------|-------------|
 | **Connection** | Set PS5 IP address and manage saved devices |
-| **Quick Start** | Pinned profiles for one-click execution |
+| **Quick Start** | Pinned flows for one-click execution |
 | **Payloads** | Upload, manage, and send individual payloads |
-| **Auto-Load Builder** | Create and edit automation workflows visually; export as autoload.zip |
-| **Saved Profiles** | All profiles with run / edit / delete controls |
+| **Auto-Load Builder** | Create and edit flows visually; configure per-flow notifications; export as autoload.zip |
+| **Saved Flows** | All flows with run / edit / delete controls |
 | **Payload Sources** | Add GitHub repos as payload sources; import and update payloads |
 | **Port Checker** | Manually verify port availability on the PS5 (Advanced Mode) |
 | **Execution Log** | Live output from the current or last execution (Advanced Mode) |
@@ -306,9 +307,11 @@ All data is stored in the HA config volume — nothing is lost on add-on updates
 ```
 /config/ps5_autopayload/
 ├── payloads/               # .lua and .elf files
-├── profiles/               # .txt workflow profiles
+├── profiles/               # .txt flow files
 ├── config.json             # UI state (IP, favorites, settings)
-└── ps5_autopayload.log     # Rotating log file
+├── sources.json            # GitHub payload sources
+├── devices.json            # Saved PS5 devices
+└── payload_meta.json       # Version history per payload
 
 /config/custom_components/ps5_autopayload/
 └── ...                     # Auto-generated HA integration (do not edit)
@@ -322,7 +325,7 @@ All data is stored in the HA config volume — nothing is lost on add-on updates
 |----------|-------------|
 | `GET /api/ha/logs` | Last 200 lines of the log file (`?lines=N` for more) |
 | `GET /api/ha/debug` | Test HA Supervisor API connection and token |
-| `POST /api/ha/reload-integration` | Refresh profile dropdown + reload HA config entry |
+| `POST /api/ha/reload-integration` | Refresh flow dropdown + reload HA config entry |
 
 ---
 
@@ -330,7 +333,6 @@ All data is stored in the HA config volume — nothing is lost on add-on updates
 
 - [ ] Smart Auto Mode (detect PS5 state automatically)
 - [ ] Docker standalone version (without Home Assistant)
-- [ ] Profile import / export
 - [ ] Webhook trigger support
 
 ---
@@ -338,8 +340,8 @@ All data is stored in the HA config volume — nothing is lost on add-on updates
 ## Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
-| Backend | FastAPI + uvicorn (Python 3.11) |
+|-----------|----------|
+| Backend | FastAPI + uvicorn (Python 3.12) |
 | Real-time | WebSocket |
 | Payload delivery | TCP socket (binary) |
 | Frontend | Vanilla HTML / CSS / JS |
@@ -355,5 +357,5 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <div align="center">
-  <sub>Built for Home Assistant · Tested on HA OS · v1.1.1</sub>
+  <sub>Built for Home Assistant · Tested on HA OS · v1.1.2</sub>
 </div>
