@@ -34,7 +34,6 @@ from routers import (
     backup,
     core,
     devices,
-    flow,
     flow_notify,
     ha,
     payloads,
@@ -92,7 +91,6 @@ app.include_router(ports.router)
 app.include_router(ha.router)
 app.include_router(backup.router)
 app.include_router(timing.router)
-app.include_router(flow.router)
 app.include_router(flow_notify.router)
 app.include_router(ws.router)
 

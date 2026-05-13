@@ -1,9 +1,9 @@
 """HTTP endpoints for flow notification testing, simulation, and history.
 
-The P2JB / Patience wait is now a normal flow step (``WAIT FOR LOADER``),
-so there is no separate monitor router. These endpoints support the
-Advanced-Mode test buttons in the flow builder and surface the
-high-level run history rendered in the UI.
+Loader waiting is a per-flow setting (the ``wait_for_loader_enabled``
+toggle in the ~notify header) — no dedicated step type. These
+endpoints back the Advanced-Mode test buttons in the flow builder
+and surface the high-level run history rendered in the UI.
 """
 from __future__ import annotations
 

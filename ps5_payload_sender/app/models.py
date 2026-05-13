@@ -75,43 +75,6 @@ class AnalyzePortRequest(BaseModel):
     interval: float = 0.5
 
 
-class FlowStepModel(BaseModel):
-    """Builder-side flow step. ``type`` selects which fields are used.
-
-    Supported step types:
-      ``payload`` ........ send a payload file
-      ``delay`` .......... sleep N ms
-      ``wait_port`` ...... short wait until a TCP port is reachable
-      ``notify`` ......... emit a free-form notification
-
-    (The legacy ``wait_for_loader`` step type was replaced by the
-    flow-level ``wait_for_loader_enabled`` header toggle. Saved
-    profiles that still carry a ``??`` directive get migrated to the
-    new model on load — see ``routers/autoload.py``.)
-    """
-    type: str
-    # payload
-    filename: str = ""
-    autoPort: int = 0
-    portOverride: Optional[int] = None
-    # delay
-    ms: int = 0
-    # wait_port
-    port: int = 0
-    timeout: float = 60.0
-    interval_ms: int = 500
-    # notify
-    title: str = ""
-    message: str = ""
-    service_override: Optional[str] = None
-
-
-class FlowAnalyzeRequest(BaseModel):
-    host: str
-    steps: List[FlowStepModel]
-    safe_mode: bool = True
-
-
 class SourceUpdateRequest(BaseModel):
     filter: str = ""
     source_type: str = "auto"
