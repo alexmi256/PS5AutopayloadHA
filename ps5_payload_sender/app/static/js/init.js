@@ -123,6 +123,12 @@ async function init() {
   await loadVersion();
   renderPayloadFilters();
   await refreshPayloads();
+  // Builder steps may have been restored from persisted state BEFORE
+  // state.payloads finished loading — at that point `_buildPayloadStep`
+  // couldn't resolve `p.source` so each payload step fell back to
+  // "Local file" and the version dropdown disappeared. Re-render now
+  // that state.payloads is populated.
+  if (builder.steps.length) builderRenderList();
   updatePayloadsSummary();
   updateBuilderSummary();
   await refreshProfiles();
