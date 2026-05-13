@@ -35,7 +35,7 @@ _log = logging.getLogger("ps5_autopayload")
 # ── Event titles ──────────────────────────────────────────────────
 
 EVENT_TITLES: Dict[str, str] = {
-    "loader_ready":   "PS5 ELF Loader is ready",
+    "loader_ready":   "PS5 Loader is ready",
     "flow_started":   "PS5 flow started",
     "flow_completed": "PS5 flow completed successfully",
     "flow_failed":    "PS5 flow failed or timed out",
