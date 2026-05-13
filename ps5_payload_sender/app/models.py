@@ -59,6 +59,9 @@ class SwitchVersionRequest(BaseModel):
     asset_name: str
     download_url: str
     version: str
+    # Git blob SHA, when the source is a repo file (folder mode). Used to
+    # detect content updates without a release/tag changing.
+    sha: str = ""
 
 
 class SetDefaultVersionRequest(BaseModel):

@@ -503,6 +503,42 @@ async function checkSourceUpdates(repo, sourceEl) {
 
   if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
 
+  // Folder-mode sources are tracked by git blob SHA, not release tag.
+  // The per-source Check button currently goes through the releases
+  // endpoint — wrong for folder sources. Instead, kick off the global
+  // SHA-aware check (which iterates over all owned files in the
+  // configured folder) and report the result for this repo.
+  const srcCfg = (state.sources || []).find(s => s.repo === repo);
+  if (srcCfg && srcCfg.source_type === 'folder') {
+    try {
+      const data = await api('/api/sources/check-updates');
+      const myUpdates = (data.updates || []).filter(u => u.repo === repo);
+      if (!state.updateResults) state.updateResults = {};
+      // Drop any stale entries for this repo, then add the fresh ones
+      Object.keys(state.updateResults)
+        .filter(k => state.updateResults[k].repo === repo)
+        .forEach(k => delete state.updateResults[k]);
+      myUpdates.forEach(u => { state.updateResults[u.filename] = u; });
+      _renderUpdateBadge(Object.keys(state.updateResults).length);
+      renderSourcesList();
+      const freshEl    = document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
+      const freshPanel = freshEl && freshEl.querySelector('.source-check-panel');
+      if (freshPanel) {
+        _populateSourceCheckPanel(freshPanel, repo, [], myUpdates, 0);
+        freshPanel.style.display = '';
+      }
+      showToast(myUpdates.length
+        ? `${myUpdates.length} update(s) available`
+        : '✔ All up to date');
+    } catch (e) {
+      log('Check folder source: ' + e.message, 'error');
+      showToast('Check failed — see log', 4500);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = icon('refresh-cw') + ' Check'; }
+    }
+    return;
+  }
+
   try {
     const data = await api(`/api/sources/releases?repo=${encodeURIComponent(repo)}`);
 
@@ -698,6 +734,10 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
             body: JSON.stringify({
               repo: u.repo, asset_name: u.asset_name,
               download_url: u.download_url, version: u.latest_version,
+              // Folder-mode sources track upstream changes by git blob
+              // SHA; ship it along so the backend stores the new
+              // baseline. Release-tag sources just leave it empty.
+              sha: u.sha || '',
             }),
           });
           delete state.updateResults[u.filename];
