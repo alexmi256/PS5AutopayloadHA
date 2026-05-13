@@ -213,6 +213,36 @@ def test_flow_level_wait_timeout_blocks_payload_steps(tmp_profile, patched_io, t
     assert "not detected within" in runs[0]["error"]
 
 
+def test_legacy_directive_skipped_when_header_toggle_already_handled(
+    tmp_profile, patched_io, tmp_history,
+):
+    """Defense in depth: if a hand-edited flow has BOTH
+    ``wait_for_loader_enabled=on`` in the header AND a legacy ``??``
+    directive, the directive must be skipped — otherwise the flow
+    would wait twice on the same port. The phase-1 (header) wait
+    runs; the directive is no-op'd with an info-level status."""
+    name = tmp_profile(
+        '# ~notify loader_ready=on wait_for_loader_enabled=on '
+        'loader_port=9021 loader_interval_s=1 loader_max_wait_s=60\n'
+        '??9021 60 1 1\n'                  # legacy directive — must be skipped
+        'kpayload.elf\n'
+    )
+    patched_io["port_plan"] = [True]       # phase-1 wait succeeds immediately
+
+    async def scenario():
+        return await exec_engine.run_autoload(AutoloadRequest(
+            host="10.0.0.5", profile=name,
+        ))
+
+    result = asyncio.run(scenario())
+    assert result["success"] is True
+    # Phase-1 polled exactly once (1 entry in plan); the directive
+    # handler would have polled again if it had run. With the guard,
+    # no second poll happens.
+    assert len(patched_io["polls"]) == 1
+    assert patched_io["payloads"], "payload step must still run after the wait"
+
+
 def test_wait_for_loader_requires_stability(tmp_profile, patched_io, tmp_history):
     """With stability=2 a single True must NOT advance the step."""
     name = tmp_profile(

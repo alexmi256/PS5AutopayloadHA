@@ -76,12 +76,15 @@ class FlowStepModel(BaseModel):
     """Builder-side flow step. ``type`` selects which fields are used.
 
     Supported step types:
-      ``payload`` ............ send a payload file
-      ``delay`` .............. sleep N ms
-      ``wait_port`` .......... short wait until a TCP port is reachable
-      ``wait_for_loader`` .... long P2JB-style wait; fires loader-ready
-                               notification and fails the flow on timeout
-      ``notify`` ............. emit a free-form notification
+      ``payload`` ........ send a payload file
+      ``delay`` .......... sleep N ms
+      ``wait_port`` ...... short wait until a TCP port is reachable
+      ``notify`` ......... emit a free-form notification
+
+    (The legacy ``wait_for_loader`` step type was replaced by the
+    flow-level ``wait_for_loader_enabled`` header toggle. Saved
+    profiles that still carry a ``??`` directive get migrated to the
+    new model on load — see ``routers/autoload.py``.)
     """
     type: str
     # payload
@@ -90,14 +93,10 @@ class FlowStepModel(BaseModel):
     portOverride: Optional[int] = None
     # delay
     ms: int = 0
-    # wait_port + wait_for_loader common
+    # wait_port
     port: int = 0
     timeout: float = 60.0
     interval_ms: int = 500
-    # wait_for_loader extras
-    max_wait_s: float = 10800.0
-    interval_s: float = 30.0
-    stability_count: int = 1
     # notify
     title: str = ""
     message: str = ""
@@ -126,17 +125,19 @@ class FlowNotifyConfig(BaseModel):
     """Per-flow notification preferences (matches the ``# ~notify …``
     header in the saved profile)."""
     # Event toggles
-    loader_ready:      bool = True
-    flow_started:      bool = False
-    flow_completed:    bool = True
-    flow_failed:       bool = True
+    loader_ready:            bool = True
+    flow_started:            bool = False
+    flow_completed:          bool = True
+    flow_failed:             bool = True
     # Delivery
-    service:           str  = ""            # must start with "notify." if set
-    persistent:        bool = True          # HA notification center
-    # Loader-watch config (also used as defaults for ?? steps with no params)
-    loader_port:       int  = 9021
-    loader_interval_s: int  = 30
-    loader_max_wait_s: int  = 10800         # 3 h
+    service:                 str  = ""      # must start with "notify." if set
+    persistent:              bool = True    # HA notification center
+    # Loader-watch master switch (replaces the WAIT FOR LOADER step)
+    wait_for_loader_enabled: bool = False
+    # Loader-watch config (also used as defaults for legacy ?? directives)
+    loader_port:             int  = 9021
+    loader_interval_s:       int  = 30
+    loader_max_wait_s:       int  = 10800   # 3 h
 
     @field_validator("service")
     @classmethod

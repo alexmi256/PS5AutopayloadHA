@@ -64,21 +64,6 @@ function updateStepStatusBadges() {
       el.className = `step-run-status step-${status}`;
       el.textContent = status === 'running' ? '⏳' : status === 'done' ? '✔' : '✗';
     }
-    // Live wait-for-loader overlay: on terminal status, finalise the
-    // overlay text since the WS poll stream just stopped.
-    const live = stepEl.querySelector('.step-wait-live');
-    if (live && status === 'error') {
-      live.className = 'step-wait-live active timeout';
-      live.innerHTML = `<span class="step-wait-icon">❌</span>
-        <span class="step-wait-text">Timeout — loader was not detected in time</span>`;
-    } else if (live && status === 'done') {
-      live.className = 'step-wait-live active reachable';
-      // Keep the last "reachable" body the WS handler left, or fall back
-      if (!live.innerHTML.trim()) {
-        live.innerHTML = `<span class="step-wait-icon">✅</span>
-          <span class="step-wait-text">Loader detected</span>`;
-      }
-    }
   });
 }
 
@@ -88,8 +73,6 @@ function clearStepRunStatus() {
   document.querySelectorAll('.step-run-status').forEach(el => {
     el.className = 'step-run-status'; el.textContent = '';
   });
-  // Don't wipe step-wait-live overlays — they're useful as run history
-  // until the next flow starts. Per-render they get re-created anyway.
 }
 
 // ── Run/Stop button state ─────────────────────────────────────────
@@ -585,55 +568,6 @@ function _buildWaitStep(step, idx, stepEl, mainRow, btns) {
   stepEl.appendChild(advDetails);
 }
 
-function _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns) {
-  const badge = document.createElement('span');
-  badge.className = 'step-type step-wait-loader';
-  badge.textContent = 'WAIT FOR LOADER';
-
-  mainRow.appendChild(_builderMakeDragHandle(stepEl));
-  mainRow.appendChild(_makeStepNum(idx));
-  mainRow.appendChild(badge);
-  mainRow.appendChild(_makeStepStatusBadge(idx));
-  const hSpacer = document.createElement('span'); hSpacer.style.flex = '1';
-  mainRow.appendChild(hSpacer);
-  mainRow.appendChild(btns);
-  stepEl.appendChild(mainRow);
-
-  // The step is now a marker — its config (port / interval / timeout) lives
-  // in the Flow Notifications panel at the top of the builder card. Show a
-  // tiny pointer line so the user knows where to look.
-  const hint = document.createElement('div');
-  hint.className = 'step-config-pointer';
-  // Read live from the flow notify config so the hint stays accurate.
-  // Step-level overrides (legacy flows) win if present; otherwise the
-  // values shown match what the engine will use at run time.
-  const cfg = (typeof flowNotifyReadConfig === 'function')
-    ? flowNotifyReadConfig() : {};
-  const port    = step.port || cfg.loader_port || 9021;
-  const ival    = Math.round(step.interval_s
-                              || step.interval_seconds
-                              || cfg.loader_interval_s
-                              || 30);
-  const maxMin  = Math.round((step.max_wait_seconds || step.max_wait_s
-                              || cfg.loader_max_wait_s || 10800) / 60);
-  hint.innerHTML =
-    `<span class="step-config-summary">`
-    + `Port <strong>${port}</strong> · `
-    + `Interval <strong>${ival}</strong>s · `
-    + `Timeout <strong>${maxMin}</strong>m`
-    + `</span>`
-    + ` <a href="#flow-notify-card" class="step-config-link">Edit in Flow Notifications ↑</a>`;
-  stepEl.appendChild(hint);
-
-  // Live progress overlay — populated by flow_wait_check WS events while the
-  // flow is paused on this step. Empty when idle so it takes no vertical
-  // space; gets the .active class once we start receiving polls.
-  const live = document.createElement('div');
-  live.className = 'step-wait-live';
-  live.dataset.port = String(port);   // used by handler to match poll msgs
-  stepEl.appendChild(live);
-}
-
 function _buildNotifyStep(step, idx, stepEl, mainRow, btns) {
   const badge = document.createElement('span');
   badge.className = 'step-type step-notify';
@@ -691,9 +625,8 @@ function _buildNotifyStep(step, idx, stepEl, mainRow, btns) {
 function builderRenderList() {
   const container = document.getElementById('builder-steps');
   container.innerHTML = '';
-  // After every render, refresh the "loader notification requires a ??
-  // step" warning in the Flow Notifications panel — adding or deleting
-  // a wait_for_loader step changes whether the warning should show.
+  // Kept as a no-op call site in case future builder events need
+  // to re-evaluate flow-notify-panel visibility after step changes.
   if (typeof flowNotifyRefreshWarn === 'function') flowNotifyRefreshWarn();
   if (!builder.steps.length) {
     container.innerHTML = '<div class="empty-state">Add your first payload to start.</div>';
@@ -708,12 +641,11 @@ function builderRenderList() {
     mainRow.className = 'step-main';
     const btns = _builderMakeOrderBtns(idx);
 
-    if      (step.type === 'payload')         _buildPayloadStep(step, idx, stepEl, mainRow, btns);
-    else if (step.type === 'delay')           _buildDelayStep(step,   idx, stepEl, mainRow, btns);
-    else if (step.type === 'wait_port')       _buildWaitStep(step,    idx, stepEl, mainRow, btns);
-    else if (step.type === 'wait_for_loader') _buildWaitLoaderStep(step, idx, stepEl, mainRow, btns);
-    else if (step.type === 'notify')          _buildNotifyStep(step,  idx, stepEl, mainRow, btns);
-    else                                      _buildWaitStep(step,    idx, stepEl, mainRow, btns);
+    if      (step.type === 'payload')   _buildPayloadStep(step, idx, stepEl, mainRow, btns);
+    else if (step.type === 'delay')     _buildDelayStep(step,   idx, stepEl, mainRow, btns);
+    else if (step.type === 'wait_port') _buildWaitStep(step,    idx, stepEl, mainRow, btns);
+    else if (step.type === 'notify')    _buildNotifyStep(step,  idx, stepEl, mainRow, btns);
+    else                                _buildWaitStep(step,    idx, stepEl, mainRow, btns);
 
     container.appendChild(stepEl);
   });

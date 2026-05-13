@@ -24,7 +24,6 @@ from autoload_parser import (
     WaitForLoaderDirective,
     WaitPortDirective,
     parse_autoload_file,
-    parse_autoload_path,
     parse_notify_config,
 )
 from config import PROFILES_DIR
@@ -360,6 +359,24 @@ async def run_autoload(req: AutoloadRequest) -> dict:
                 # carry `??` lines keep working. New flows use the
                 # flow-level wait_for_loader_enabled toggle (Phase 1 above)
                 # and emit no `??` directive at all.
+                #
+                # Guard: if the header already triggered the Phase 1 wait,
+                # skip this directive — otherwise we'd block again on the
+                # same port (a flow that hand-edited to have both would
+                # wait twice). Status hint helps the user notice the
+                # redundancy.
+                if notify_cfg.get("wait_for_loader_enabled"):
+                    _log.info(
+                        "Skipping legacy ?? directive at step %d — flow-level "
+                        "wait_for_loader_enabled already handled the wait", i,
+                    )
+                    await manager.status(
+                        f"[{i}/{len(directives)}] WAIT FOR LOADER skipped "
+                        f"(already handled by flow setting)",
+                        level="info",
+                    )
+                    continue
+
                 eff_port      = d.port or int(notify_cfg.get("loader_port") or 9021)
                 eff_max_wait  = d.max_wait_seconds or float(notify_cfg.get("loader_max_wait_s") or 10800)
                 eff_interval  = d.interval_seconds or float(notify_cfg.get("loader_interval_s") or 30)
@@ -461,7 +478,7 @@ async def run_autoload(req: AutoloadRequest) -> dict:
         # Lifecycle notifications + history record
         total_waited = asyncio.get_running_loop().time() - flow_start_mono
         try:
-            if history_result in ("completed", "loader_ready"):
+            if history_result == "completed":
                 await notifications.fire_if_enabled(
                     "flow_completed", notify_cfg,
                     message=(

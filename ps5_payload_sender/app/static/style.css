@@ -111,44 +111,16 @@ body {
 .update-count-badge  .lucide,
 .payload-update-warn .lucide { width:12px; height:12px; vertical-align:-1px; }
 
-/* ---- P2JB Monitor ---- */
-.p2jb-status-row {
-  display:flex; align-items:center; gap:.55rem; flex-wrap:wrap;
-  margin:.4rem 0 .9rem;
-}
-.p2jb-pill {
-  display:inline-flex; align-items:center; gap:.3rem;
-  padding:.18rem .55rem; border-radius:999px;
-  border:1px solid currentColor; font-size:.74rem; font-weight:600;
-  white-space:nowrap;
-}
-.p2jb-pill::before {
-  content:''; width:.45rem; height:.45rem; border-radius:50%;
-  background:currentColor;
-}
-.p2jb-pill-idle    { color:var(--dim) }
-.p2jb-pill-waiting { color:var(--warn); animation:pulse 1.6s infinite }
-.p2jb-pill-ok      { color:var(--green) }
-.p2jb-pill-running { color:var(--primary); animation:pulse 1.6s infinite }
-.p2jb-pill-err     { color:var(--danger) }
-.p2jb-status-sub   { font-size:.78rem; color:var(--muted) }
-
+/* ---- Flow notification grids (used by Flow Notifications panel) ---- */
 .p2jb-grid {
   display:grid; grid-template-columns:1fr 1fr; gap:.55rem .65rem;
   margin-bottom:.4rem;
 }
 .p2jb-grid .field-group { margin-bottom:0 }
 
-.p2jb-notif-block {
-  background:var(--bg-soft); border:1px solid var(--border);
-  border-radius:var(--r-sm); padding:.6rem .7rem; margin-top:.4rem;
-}
 .p2jb-notif-grid {
   display:grid; grid-template-columns:1fr 1fr; gap:.25rem .6rem;
   margin-top:.35rem;
-}
-.p2jb-notif-block code {
-  background:var(--card-hi); padding:0 .25rem; border-radius:3px; font-size:.85em;
 }
 
 /* Recent runs */
@@ -460,10 +432,9 @@ body {
 .payload-label      { font-weight:600; padding:2px 8px; border-radius:6px; font-size:12px; flex-shrink:0; }
 .payload-label.lua  { background:rgba(245,158,11,.18); color:var(--lua) }
 .payload-label.elf  { background:rgba(59,130,246,.18); color:var(--elf) }
-.step-delay       { background:rgba(16,185,129,.15);  color:var(--green)   }
-.step-wait        { background:rgba(148,163,184,.15); color:var(--muted)   }
-.step-wait-loader { background:rgba(245,158,11,.15);  color:var(--warn)    }
-.step-notify      { background:rgba(99,102,241,.18);  color:var(--primary) }
+.step-delay  { background:rgba(16,185,129,.15);  color:var(--green)   }
+.step-wait   { background:rgba(148,163,184,.15); color:var(--muted)   }
+.step-notify { background:rgba(99,102,241,.18);  color:var(--primary) }
 
 /* Per-flow notify config inside the builder.
    The whole <details> reads as a button when collapsed (primary-tinted
@@ -509,63 +480,7 @@ body {
 
 .input-error { border-color:var(--danger) !important }
 
-/* Wait-for-loader step: marker pointer to the Flow Notifications panel */
-.step-config-pointer {
-  display:flex; flex-wrap:wrap; align-items:center;
-  gap:.4rem; margin:.35rem 0 0;
-  font-size:.8rem; color:var(--muted);
-}
-.step-config-summary  { color:var(--text) }
-.step-config-summary strong { color:var(--text); font-weight:600 }
-.step-config-link {
-  margin-left:auto;
-  color:var(--primary); text-decoration:none;
-  font-weight:600; font-size:.78rem;
-}
-.step-config-link:hover { text-decoration:underline }
-
-/* Flow Notifications panel — loader config section */
-.flow-loader-cfg { padding-top:.3rem }
-
-/* Wait-for-loader: live progress overlay (filled by flow_wait_check WS events) */
-.step-wait-live {
-  display:none;
-  align-items:center; gap:.4rem;
-  margin:.4rem 0 0; padding:.4rem .6rem;
-  border-radius:var(--r-sm);
-  background:var(--bg-soft); border:1px dashed var(--border);
-  font-size:.8rem;
-}
-.step-wait-live.active        { display:flex }
-.step-wait-live.reachable     { border-style:solid; border-color:var(--green);
-                                background:var(--green-soft); color:var(--green) }
-.step-wait-live.timeout       { border-style:solid; border-color:var(--danger);
-                                background:var(--danger-soft); color:var(--danger) }
-.step-wait-icon               { font-size:1rem; line-height:1 }
-.step-wait-live:not(.reachable):not(.timeout) .step-wait-icon { animation:pulse 1.6s infinite }
-.step-wait-text               { flex:1 }
-.step-wait-elapsed            { color:var(--muted); font-variant-numeric:tabular-nums }
-.step-wait-live.reachable .step-wait-elapsed { color:inherit; opacity:.85 }
-
-/* Wait-for-loader add-panel help block */
-.step-help {
-  margin:0 0 .55rem; padding:.5rem .65rem;
-  background:var(--bg-soft); border-left:3px solid var(--primary);
-  border-radius:var(--r-sm); font-size:.83rem; line-height:1.45;
-}
-.step-help-typical {
-  display:flex; gap:.45rem; align-items:center;
-  margin:.25rem 0 .35rem; padding:.4rem .55rem;
-  background:var(--card-hi); border-radius:var(--r-sm);
-  font-size:.78rem;
-}
-.step-help-typical-label { color:var(--muted); font-weight:600 }
-.step-help-flow          { color:var(--text) }
-.field-hint              { color:var(--muted); font-size:.74rem; display:block; margin-top:.2rem }
-
-/* Builder preset row (sits above the step add-buttons) */
-.builder-presets { display:flex; gap:.4rem; margin-bottom:.45rem }
-.builder-presets .btn { gap:.3rem }
+.field-hint { color:var(--muted); font-size:.74rem; display:block; margin-top:.2rem }
 
 .step-filename {
   flex:1; font-size:.87rem; line-height:1.35; min-width:0;
