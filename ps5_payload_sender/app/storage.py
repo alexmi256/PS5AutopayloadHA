@@ -155,7 +155,25 @@ def list_payloads() -> List[dict]:
             if f.name in meta:
                 src = dict(meta[f.name])
                 versions = src.get("versions") or []
-                src["latest_version"] = versions[0]["tag"] if versions else src.get("version", "")
+                # Pick the most recently published version as "latest".
+                # If no entry carries a published_at (legacy meta from
+                # before we persisted that field), fall back to whatever
+                # version the user actually has installed — that's at
+                # least a version they recently interacted with, and
+                # picking it as "latest" is far less misleading than
+                # the previous tier-based heuristic which mislabelled
+                # beta as latest when a test build was actually newer.
+                installed_tag = src.get("version", "")
+                dated = [v for v in versions if v.get("published_at")]
+                if dated:
+                    newest = max(dated, key=lambda v: v["published_at"])
+                    src["latest_version"] = newest["tag"]
+                elif versions and any(v["tag"] == installed_tag for v in versions):
+                    src["latest_version"] = installed_tag
+                elif versions:
+                    src["latest_version"] = versions[0]["tag"]
+                else:
+                    src["latest_version"] = installed_tag
                 entry["source"] = src
             result.append(entry)
     return result
@@ -171,15 +189,20 @@ def list_profiles() -> List[str]:
 # ── Version helpers ───────────────────────────────────────────────
 
 def sort_versions(versions: list) -> list:
-    """Stable-sort versions: stable releases → beta → alpha/test."""
-    def _tier(v: dict) -> int:
-        tag = v.get("tag", "").lower()
-        if "alpha" in tag or "test" in tag:
-            return 2
-        if "beta" in tag:
-            return 1
-        return 0
-    return sorted(versions, key=_tier)
+    """Sort versions newest-first by their GitHub ``published_at``
+    timestamp. Entries without a date keep their relative order
+    behind the dated ones (Python's sorted() is stable). This is
+    what the UI uses to label the topmost option as "(latest)".
+
+    Previously this function ranked stable > beta > alpha/test which
+    produced wrong labels when a maintainer published a test build
+    AFTER the last stable (e.g. shadowmountplus 1.6test11 published
+    later than 1.6beta10 — the test build is the actual latest, not
+    the beta).
+    """
+    def _key(v: dict) -> str:
+        return v.get("published_at") or ""
+    return sorted(versions, key=_key, reverse=True)
 
 
 def trim_versions(versions: list) -> list:
