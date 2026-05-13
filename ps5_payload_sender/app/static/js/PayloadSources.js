@@ -664,14 +664,23 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
     panel.appendChild(updList);
 
     applyBtn.addEventListener('click', async () => {
-      const selected = Array.from(updList.querySelectorAll('.source-update-row'))
-        .filter(r => r.querySelector('input[type=checkbox]').checked)
+      const selectedRows = Array.from(updList.querySelectorAll('.source-update-row'))
+        .filter(r => r.querySelector('input[type=checkbox]').checked);
+      const selected = selectedRows
         .map(r => state.updateResults[r.dataset.filename])
         .filter(Boolean);
       if (!selected.length) return;
       applyBtn.disabled = true; applyBtn.textContent = 'Updating…';
+
       let done = 0;
+      const failed = [];     // [{filename, message}]
       for (const u of selected) {
+        const row = updList.querySelector(
+          `.source-update-row[data-filename="${CSS.escape(u.filename)}"]`,
+        );
+        // Clear any prior error chip on retry
+        row?.querySelector('.source-update-err')?.remove();
+        row?.classList.remove('source-update-row--failed');
         try {
           await api(`/api/payloads/${encodeURIComponent(u.filename)}/switch-version`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -681,19 +690,41 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
             }),
           });
           delete state.updateResults[u.filename];
-          const row = updList.querySelector(`.source-update-row[data-filename="${CSS.escape(u.filename)}"]`);
           if (row) row.remove();
           done++;
         } catch (e) {
-          log(`Update '${u.filename}': ${e.message}`, 'error');
+          // Surface the failure inline so the user sees WHY the update
+          // didn't take. The api() helper formats backend errors as
+          // "HTTP <status> <body>" — the body usually contains the
+          // GitHub-side reason (rate limit, 404, etc.).
+          failed.push({ filename: u.filename, message: e.message });
+          log(`Update '${u.filename}' failed: ${e.message}`, 'error');
+          if (row) {
+            row.classList.add('source-update-row--failed');
+            const err = document.createElement('div');
+            err.className = 'source-update-err';
+            err.textContent = e.message;
+            row.appendChild(err);
+          }
         }
       }
-      showToast(`${done} payload(s) updated`);
+
+      // Summary toast — success is brief, failures stay on screen 6 s
+      // so the user has time to read the actual reason.
+      if (failed.length === 0) {
+        showToast(`${done} payload(s) updated`);
+      } else if (done === 0) {
+        showToast(`⚠ Update failed: ${failed[0].message}`, 6000);
+      } else {
+        showToast(`${done} updated, ${failed.length} failed — see rows below`, 6000);
+      }
+
       await refreshPayloads();
       // renderSourcesList() rebuilds the source-item nodes, which detaches
-      // updList/applyBtn from the DOM. Operating on them afterwards is a no-op
-      // and leaves the panel in a stale state. Re-render the panel with the
-      // remaining updates so the user sees the post-update status instead.
+      // updList/applyBtn from the DOM. Re-render the panel with the
+      // remaining updates so the user sees the post-update status. Failed
+      // rows stay in state.updateResults and the panel re-populates them
+      // with the inline error chip preserved via the same data flow.
       renderSourcesList();
       _renderUpdateBadge(Object.keys(state.updateResults).length);
       const freshEl    = document.querySelector(`.source-item[data-repo="${CSS.escape(repo)}"]`);
@@ -702,6 +733,19 @@ function _populateSourceCheckPanel(panel, repo, newAssets, repoUpdates, imported
         const remaining = Object.values(state.updateResults).filter(u => u.repo === repo);
         _populateSourceCheckPanel(freshPanel, repo, newAssets, remaining, importedCount);
         freshPanel.style.display = '';
+        // Re-attach error chips to rows that just failed (the panel rebuild
+        // dropped them along with the old DOM nodes).
+        failed.forEach(f => {
+          const row = freshPanel.querySelector(
+            `.source-update-row[data-filename="${CSS.escape(f.filename)}"]`,
+          );
+          if (!row) return;
+          row.classList.add('source-update-row--failed');
+          const err = document.createElement('div');
+          err.className = 'source-update-err';
+          err.textContent = f.message;
+          row.appendChild(err);
+        });
       }
     });
 
